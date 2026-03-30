@@ -9,14 +9,14 @@ namespace CoopEducation.Services
 {
     public interface ITokenService
     {
-        string GenerateAccessToken(int userId, string username, string role);
+        string GenerateAccessToken(int userId, string username, string roleName);
         string GenerateCsrfToken();
         string GenerateRefreshToken();
         ClaimsPrincipal? ValidateToken(string token);
     }
     public class TokenService : ITokenService
     {
-        public string GenerateAccessToken(int userId, string username, string role)
+        public string GenerateAccessToken(int userId, string username, string roleName)
         {
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(NSTools.GetAppConfig("Key")));
@@ -25,7 +25,7 @@ namespace CoopEducation.Services
             {
                 new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
                 new Claim(JwtRegisteredClaimNames.UniqueName, username),
-                new Claim(ClaimTypes.Role, role),
+                new Claim(ClaimTypes.Role, roleName),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
             int number = NSTools.IsNumeric(NSTools.GetAppConfig("AccessTokenExpiryMinutes")) ? Convert.ToInt16(NSTools.GetAppConfig("AccessTokenExpiryMinutes")) : 60;
