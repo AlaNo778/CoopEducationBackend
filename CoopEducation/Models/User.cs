@@ -23,6 +23,8 @@ public partial class User
 
     public int? UpdateBy { get; set; }
 
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
     public virtual Role Role { get; set; } = null!;
 
     public virtual Staff? Staff { get; set; }
