@@ -97,7 +97,7 @@ namespace CoopEducation.Controllers.Login
                 Path = "/"
             });
             string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
-            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.ControllerName,"","", NSTools.GetEnumDescription(ResponseCode.Success) ?? "",user.UserId);
+            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "","", NSTools.GetEnumDescription(ResponseCode.Success) ?? "",user.UserId);
             allServices.SysApilogs(setLogDto);
             return Ok(new LoginResponse
             {
@@ -110,9 +110,9 @@ namespace CoopEducation.Controllers.Login
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            int userId = Convert.ToInt32(_userService.GetClaimValue("UserId"));
+            int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
             string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
-            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.ControllerName, "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
+            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
             var refreshToken = Request.Cookies["refresh_token"];
             if (!string.IsNullOrEmpty(refreshToken))
             {
@@ -134,33 +134,40 @@ namespace CoopEducation.Controllers.Login
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {
-            int userId = Convert.ToInt32(_userService.GetClaimValue("UserId"));
-            string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
-            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.ControllerName, "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
-            var refreshToken = Request.Cookies["refresh_token"];
-            if (string.IsNullOrEmpty(refreshToken))
-                return Unauthorized();
-            var tokenEntity = await _context.RefreshTokens
-                .Include(t => t.User)
-                .ThenInclude(u => u.Role)
-                .FirstOrDefaultAsync(t => t.Token == refreshToken && t.Revoked == false);
-            if (tokenEntity == null || tokenEntity.Expiry < DateTime.UtcNow)
-                return Unauthorized();
-            var newAccessToken = _tokenService.GenerateAccessToken(
-                tokenEntity.User.UserId,
-                tokenEntity.User.Username,
-                tokenEntity.User.Role.RoleName
-            );
-            int accessTokenExpiryMinutes = int.TryParse(NSTools.GetAppConfig("AccessTokenExpiryMinutes"), out var m) ? m : 60;
-            Response.Cookies.Append("access_token", newAccessToken, new CookieOptions
+            try
             {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes)
-            });
-            allServices.SysApilogs(setLogDto);
-            return Ok(new { accessToken = newAccessToken });
+                int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
+                string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
+                SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
+                var refreshToken = Request.Cookies["refresh_token"];
+                if (string.IsNullOrEmpty(refreshToken))
+                    return Unauthorized();
+                var tokenEntity = await _context.RefreshTokens
+                    .Include(t => t.User)
+                    .ThenInclude(u => u.Role)
+                    .FirstOrDefaultAsync(t => t.Token == refreshToken && t.Revoked == false);
+                if (tokenEntity == null || tokenEntity.Expiry < DateTime.UtcNow)
+                    return Unauthorized();
+                var newAccessToken = _tokenService.GenerateAccessToken(
+                    tokenEntity.User.UserId,
+                    tokenEntity.User.Username,
+                    tokenEntity.User.Role.RoleName
+                );
+                int accessTokenExpiryMinutes = int.TryParse(NSTools.GetAppConfig("AccessTokenExpiryMinutes"), out var m) ? m : 60;
+                Response.Cookies.Append("access_token", newAccessToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Expires = DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes)
+                });
+                allServices.SysApilogs(setLogDto);
+                return Ok(new { accessToken = newAccessToken });
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500);
+            }
         }
         private async Task<ValidateUserDTO?> ValidateUser(string username,string password)
         {

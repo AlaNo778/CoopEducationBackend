@@ -12,14 +12,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 NSTools.ConfigurationHelper.Initialize(builder.Configuration);
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddDbContext<CoopEducationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        var key = Encoding.UTF8.GetBytes(builder.Configuration["Key"]);
+        var key = Encoding.UTF8.GetBytes(builder.Configuration["Key"]!);
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
