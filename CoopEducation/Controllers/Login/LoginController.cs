@@ -23,11 +23,6 @@ namespace CoopEducation.Controllers.Login
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var checkUser = await CheckUser(request.Username);
-            if (!checkUser)
-            {
-                return NotFound("User not found");
-            }
             var user = await ValidateUser(request.Username, request.Password);
             if (user == null)
             {
@@ -79,11 +74,6 @@ namespace CoopEducation.Controllers.Login
             Response.Cookies.Delete("access_token");
             Response.Cookies.Delete("refresh_token");
             return NoContent();
-        }
-        private async Task<bool> CheckUser(string username)
-        {
-            return await _context.Users
-                .AnyAsync(u => u.Username == username && u.IsActive == true);
         }
         private async Task<ValidateUserDTO?> ValidateUser(string username,string password)
         {
