@@ -18,12 +18,13 @@ namespace CoopEducation.Controllers.Login
         private readonly ITokenService _tokenService;
         private readonly CoopEducationDbContext _context;
         private readonly AllServices allServices;
-        public LoginController(ITokenService tokenService,CoopEducationDbContext context)
+        private readonly IUserService _userService;
+        public LoginController(ITokenService tokenService,CoopEducationDbContext context, IUserService userService)
         {
             _tokenService = tokenService;
             _context = context;
             allServices = new(_context, _tokenService);
-            
+            _userService = userService; 
         }
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -109,8 +110,10 @@ namespace CoopEducation.Controllers.Login
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
+            int userId = Convert.ToInt32(_userService.GetClaimValue("UserId"));
+            string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
+            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.ControllerName, "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
             var refreshToken = Request.Cookies["refresh_token"];
-
             if (!string.IsNullOrEmpty(refreshToken))
             {
                 var token = await _context.RefreshTokens
@@ -122,29 +125,27 @@ namespace CoopEducation.Controllers.Login
                     await _context.SaveChangesAsync();
                 }
             }
-
             Response.Cookies.Delete("access_token");
             Response.Cookies.Delete("refresh_token");
             Response.Cookies.Delete("csrf_token");
-
+            allServices.SysApilogs(setLogDto);
             return NoContent();
         }
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {
+            int userId = Convert.ToInt32(_userService.GetClaimValue("UserId"));
+            string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
+            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.ControllerName, "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
             var refreshToken = Request.Cookies["refresh_token"];
-
             if (string.IsNullOrEmpty(refreshToken))
                 return Unauthorized();
-
             var tokenEntity = await _context.RefreshTokens
                 .Include(t => t.User)
                 .ThenInclude(u => u.Role)
                 .FirstOrDefaultAsync(t => t.Token == refreshToken && t.Revoked == false);
-
             if (tokenEntity == null || tokenEntity.Expiry < DateTime.UtcNow)
                 return Unauthorized();
-
             var newAccessToken = _tokenService.GenerateAccessToken(
                 tokenEntity.User.UserId,
                 tokenEntity.User.Username,
@@ -158,7 +159,7 @@ namespace CoopEducation.Controllers.Login
                 SameSite = SameSiteMode.None,
                 Expires = DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes)
             });
-
+            allServices.SysApilogs(setLogDto);
             return Ok(new { accessToken = newAccessToken });
         }
         private async Task<ValidateUserDTO?> ValidateUser(string username,string password)
