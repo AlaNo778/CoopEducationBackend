@@ -6,6 +6,8 @@ using CoopEducation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using static CoopEducation.Models.Constant.ConstantVariables;
 
 namespace CoopEducation.Controllers.Login
 {
@@ -15,10 +17,13 @@ namespace CoopEducation.Controllers.Login
     {
         private readonly ITokenService _tokenService;
         private readonly CoopEducationDbContext _context;
+        private readonly AllServices allServices;
         public LoginController(ITokenService tokenService,CoopEducationDbContext context)
         {
             _tokenService = tokenService;
             _context = context;
+            allServices = new(_context, _tokenService);
+            
         }
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -90,6 +95,9 @@ namespace CoopEducation.Controllers.Login
                 SameSite = SameSiteMode.None,
                 Path = "/"
             });
+            string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
+            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.ControllerName,"","", NSTools.GetEnumDescription(ResponseCode.Success) ?? "",user.UserId);
+            allServices.SysApilogs(setLogDto);
             return Ok(new LoginResponse
             {
                 AccessToken = accessToken,

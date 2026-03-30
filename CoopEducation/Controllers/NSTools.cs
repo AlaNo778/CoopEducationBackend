@@ -1,4 +1,7 @@
-﻿using System.Globalization;
+﻿using CoopEducation.Models;
+using System.ComponentModel;
+using System.Globalization;
+using System.Reflection;
 
 namespace CoopEducation.Controllers
 {
@@ -34,6 +37,19 @@ namespace CoopEducation.Controllers
                 return double.TryParse(objValue.ToString(), NumberStyles.Any, null, out _);
             }
             else { return false; }
+        }
+        public static string? GetEnumDescription(Enum value)
+        {
+            FieldInfo? fi = value.GetType().GetField(value.ToString());
+            if (fi != null)
+            {
+                var attributes = fi.GetCustomAttributes(typeof(DescriptionAttribute), false) as DescriptionAttribute[];
+                if (attributes != null && attributes.Length > 0)
+                {
+                    return attributes[0].Description;
+                }
+            }
+            return null;
         }
     }
 }
