@@ -8,6 +8,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
 NSTools.ConfigurationHelper.Initialize(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddScoped<ITokenService, TokenService>();
