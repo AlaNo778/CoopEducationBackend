@@ -7,5 +7,6 @@ namespace CoopEducation.Controllers.Login
     [ApiController]
     public class TokenController : ControllerBase
     {
+
     }
 }
