@@ -44,12 +44,34 @@ namespace CoopEducation.Controllers.Login
                 var refreshExpiry = DateTime.UtcNow.AddDays(number);
                 cookieOptions.Expires = refreshExpiry;
                 Response.Cookies.Append("refresh_token", refreshToken, cookieOptions);
-                //เหมือนจะต้องเก็บ refresh token ลง database ด้วยนะครับ เพื่อใช้ในการตรวจสอบและยกเลิก token ได้ในอนาคต รอมาแก้
+                var refreshTokenEntity = new RefreshToken
+                {
+                    Token = refreshToken,
+                    UserId = user.UserId,
+                    Expiry = refreshExpiry,
+                    CreatedAt = DateTime.UtcNow,
+                    Revoked = false
+                };
+                await _context.RefreshTokens.AddAsync(refreshTokenEntity);
+                await _context.SaveChangesAsync();
             }
             else
             {
-                // ไม่ Remember Me: Session cookie (ปิด browser = หมดอายุ)
-                // ไม่ set Expires → เป็น session cookie อัตโนมัติ
+                var oldRefreshToken = Request.Cookies["refresh_token"];
+
+                if (!string.IsNullOrEmpty(oldRefreshToken))
+                {
+                    var token = await _context.RefreshTokens
+                        .FirstOrDefaultAsync(t => t.Token == oldRefreshToken);
+
+                    if (token != null)
+                    {
+                        token.Revoked = true;
+                    }
+
+                    Response.Cookies.Delete("refresh_token");
+                    await _context.SaveChangesAsync();
+                }
             }
             int AccessTokenExpiryMinutes = NSTools.IsNumeric(NSTools.GetAppConfig("AccessTokenExpiryMinutes")) ? Convert.ToInt16(NSTools.GetAppConfig("AccessTokenExpiryMinutes")) : 60;
             Response.Cookies.Append("access_token", accessToken, new CookieOptions
@@ -58,6 +80,13 @@ namespace CoopEducation.Controllers.Login
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.AddMinutes(AccessTokenExpiryMinutes),
+                Path = "/"
+            });
+            Response.Cookies.Append("csrf_token", csrfToken, new CookieOptions
+            {
+                HttpOnly = false,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
                 Path = "/"
             });
             return Ok(new LoginResponse
@@ -69,11 +98,56 @@ namespace CoopEducation.Controllers.Login
             });
         }
         [HttpPost("logout")]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
+            var refreshToken = Request.Cookies["refresh_token"];
+
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                var token = await _context.RefreshTokens
+                    .FirstOrDefaultAsync(t => t.Token == refreshToken);
+
+                if (token != null)
+                {
+                    token.Revoked = true;
+                    await _context.SaveChangesAsync();
+                }
+            }
             Response.Cookies.Delete("access_token");
             Response.Cookies.Delete("refresh_token");
             return NoContent();
+        }
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            var refreshToken = Request.Cookies["refresh_token"];
+
+            if (string.IsNullOrEmpty(refreshToken))
+                return Unauthorized();
+
+            var tokenEntity = await _context.RefreshTokens
+                .Include(t => t.User)
+                .ThenInclude(u => u.Role)
+                .FirstOrDefaultAsync(t => t.Token == refreshToken && t.Revoked == false);
+
+            if (tokenEntity == null || tokenEntity.Expiry < DateTime.UtcNow)
+                return Unauthorized();
+
+            var newAccessToken = _tokenService.GenerateAccessToken(
+                tokenEntity.User.UserId,
+                tokenEntity.User.Username,
+                tokenEntity.User.Role.RoleName
+            );
+
+            Response.Cookies.Append("access_token", newAccessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddMinutes(60)
+            });
+
+            return Ok(new { accessToken = newAccessToken });
         }
         private async Task<ValidateUserDTO?> ValidateUser(string username,string password)
         {
