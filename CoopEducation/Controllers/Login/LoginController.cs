@@ -70,7 +70,7 @@ namespace CoopEducation.Controllers.Login
             }
             else
             {
-                Response.Cookies.Delete("refresh_token"); // ลบ cookie อย่างเดียว (DB ถูก revoke ไปแล้วด้านบน)
+                Response.Cookies.Delete("refresh_token");
             }
             await _context.SaveChangesAsync();
 
