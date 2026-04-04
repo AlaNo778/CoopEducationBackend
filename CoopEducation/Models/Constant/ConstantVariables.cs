@@ -21,7 +21,10 @@ namespace CoopEducation.Models.Constant
             [Description("402")]
             LicenseCardInProgress,
             [Description("409")]
-            MessageDataAlreadyExists
+            MessageDataAlreadyExists,
+            [Description("404")]
+            NotFound
+
         }
     }
 }

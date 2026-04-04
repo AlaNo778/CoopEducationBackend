@@ -13,6 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 NSTools.ConfigurationHelper.Initialize(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<AllServices>();
+builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddDbContext<CoopEducationDbContext>(options =>
