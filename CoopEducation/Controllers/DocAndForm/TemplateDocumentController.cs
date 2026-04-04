@@ -10,14 +10,14 @@ namespace CoopEducation.Controllers.DocAndForm
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class DocumentController : ControllerBase
+    public class TemplateDocumentController : ControllerBase
     {
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
         private readonly AllServices allServices;
         private readonly DocumentService _docService;
         private readonly IUserService _userService;
-        public DocumentController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService,DocumentService docService)
+        public TemplateDocumentController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService,DocumentService docService)
         {
             _tokenService = tokenService;
             _context = context;
@@ -26,7 +26,7 @@ namespace CoopEducation.Controllers.DocAndForm
             _docService = docService;
         }
         [HttpGet]
-        public async Task<IActionResult> GetDocuments([FromQuery] int docId)
+        public async Task<IActionResult> GetTemplateDocuments([FromQuery] int docId)
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
             string methodName = MethodOfLogSystem.GET.ToString();
