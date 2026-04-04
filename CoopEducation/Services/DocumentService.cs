@@ -22,7 +22,7 @@ namespace CoopEducation.Services
         {
             try
             {
-                if (docRequest != null)
+                if (docRequest > 0)
                 {
                     string supabaseUrl = Convert.ToString(NSTools.GetAppConfig("SUPABASE_URL"));
                     string supabaseKey = Convert.ToString(NSTools.GetAppConfig("SUPABASE_KEY"));
@@ -40,14 +40,14 @@ namespace CoopEducation.Services
                 }
                 else
                 {
-                    return new MemoryStream();
+                    return null!;
                 }
             }
             catch (Exception ex)
             {
                 var logs = _allServices.PrepareLog("DocumentService","",docRequest.ToString(),ex.ToString(),"",userId);
                 _allServices.SysApilogs(logs);
-                return new MemoryStream();
+                return null!;
             }
         }
         private string GetDocumentName(int docId)
