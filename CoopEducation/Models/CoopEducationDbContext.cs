@@ -25,6 +25,8 @@ public partial class CoopEducationDbContext : DbContext
 
     public virtual DbSet<DocumentType> DocumentTypes { get; set; }
 
+    public virtual DbSet<Major> Majors { get; set; }
+
     public virtual DbSet<Mentor> Mentors { get; set; }
 
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
@@ -199,6 +201,18 @@ public partial class CoopEducationDbContext : DbContext
                 .HasColumnName("type_name");
         });
 
+        modelBuilder.Entity<Major>(entity =>
+        {
+            entity.HasKey(e => e.MajorId).HasName("PK__major__DC7AC3C4A74670BC");
+
+            entity.ToTable("majors");
+
+            entity.Property(e => e.MajorId).HasColumnName("major_id");
+            entity.Property(e => e.MajorName)
+                .HasMaxLength(250)
+                .HasColumnName("major_name");
+        });
+
         modelBuilder.Entity<Mentor>(entity =>
         {
             entity.HasKey(e => e.MentorId).HasName("PK__mentors__E5D27EF3CD741969");
@@ -334,16 +348,17 @@ public partial class CoopEducationDbContext : DbContext
             entity.Property(e => e.LastName)
                 .HasMaxLength(100)
                 .HasColumnName("last_name");
-            entity.Property(e => e.Program)
-                .HasMaxLength(100)
-                .HasDefaultValue("วิทยาการคอมพิวเตอร์")
-                .HasColumnName("program");
+            entity.Property(e => e.MajorId).HasColumnName("major_id");
             entity.Property(e => e.StudentCode)
                 .HasMaxLength(10)
                 .IsUnicode(false)
                 .HasColumnName("student_code");
             entity.Property(e => e.TotalCredits).HasColumnName("total_credits");
             entity.Property(e => e.UserId).HasColumnName("user_id");
+
+            entity.HasOne(d => d.Major).WithMany(p => p.Students)
+                .HasForeignKey(d => d.MajorId)
+                .HasConstraintName("fk_major_student");
 
             entity.HasOne(d => d.User).WithOne(p => p.Student)
                 .HasForeignKey<Student>(d => d.UserId)
@@ -426,10 +441,6 @@ public partial class CoopEducationDbContext : DbContext
                 .HasMaxLength(100)
                 .IsUnicode(false)
                 .HasColumnName("file_name");
-            entity.Property(e => e.FilePath)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("file_path");
             entity.Property(e => e.FileSize)
                 .HasMaxLength(20)
                 .IsUnicode(false)

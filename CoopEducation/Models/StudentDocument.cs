@@ -13,8 +13,6 @@ public partial class StudentDocument
 
     public int? PlacementId { get; set; }
 
-    public string FilePath { get; set; } = null!;
-
     public string? FileName { get; set; }
 
     public string? FileSize { get; set; }

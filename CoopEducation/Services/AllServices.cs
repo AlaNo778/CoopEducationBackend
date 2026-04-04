@@ -39,5 +39,43 @@ namespace CoopEducation.Services
             _context.ApiLogs.Add(apiLog);
             _context.SaveChanges();
         }
+        public SetLogDocDTO LogDoc(string roleName, int userId, int docId, string fileName)
+        {
+            if (roleName == "student")
+            {
+                SetLogDocDTO logDoc = new SetLogDocDTO
+                {
+                    StudentId = Convert.ToInt32(GetStudentId(userId)),
+                    DocTypeId = docId,
+                    FileName = fileName,
+                    PlacementId = Convert.ToInt32(GetPlacementId(userId)),
+                    UploadedAt = DateTime.Now,
+                };
+                return logDoc;
+            }
+            return new SetLogDocDTO();
+        }
+        public void SysDocLogs(SetLogDocDTO setLogDocDto)
+        {
+            StudentDocument docLog = new StudentDocument()
+            {
+                StudentId = setLogDocDto.StudentId,
+                DocTypeId = setLogDocDto.DocTypeId,
+                FileName = setLogDocDto.FileName,
+                PlacementId = setLogDocDto.PlacementId,
+                UploadedAt = setLogDocDto.UploadedAt
+            };
+            _context.StudentDocuments.Add(docLog);
+            _context.SaveChanges();
+        }
+        private string GetPlacementId(int userId)
+        {
+            int studentId = GetStudentId(userId);
+            return _context.CoopPlacements.Where(c => c.StudentId == studentId).Select(s => s.PlacementId).FirstOrDefault().ToString() ?? "";
+        }
+        private int GetStudentId(int userId)
+        {
+            return _context.Students.Where(s => s.UserId == userId).Select(s => s.StudentId).FirstOrDefault();
+        }
     }
 }
