@@ -97,7 +97,7 @@ namespace CoopEducation.Controllers.Login
                 Path = "/"
             });
             string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
-            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "","", NSTools.GetEnumDescription(ResponseCode.Success) ?? "",user.UserId);
+            SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "","Login successful", NSTools.GetEnumDescription(ResponseCode.Success) ?? "",user.UserId);
             allServices.SysApilogs(setLogDto);
             return Ok(new LoginResponse
             {
