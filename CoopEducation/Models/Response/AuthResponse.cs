@@ -1,6 +1,6 @@
 ﻿namespace CoopEducation.Models.Response
 {
-    public class LoginResponse
+    public class AuthResponse
     {
         public string AccessToken { get; set; } = string.Empty;
         public string CsrfToken { get; set; } = string.Empty;

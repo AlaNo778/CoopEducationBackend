@@ -374,6 +374,10 @@ public partial class CoopEducationDbContext : DbContext
             entity.HasIndex(e => e.StudentId, "UQ__student___2A33069B8D86CD47").IsUnique();
 
             entity.Property(e => e.AddressId).HasColumnName("address_id");
+            entity.Property(e => e.Alley)
+                .HasMaxLength(100)
+                .IsFixedLength()
+                .HasColumnName("alley");
             entity.Property(e => e.District)
                 .HasMaxLength(50)
                 .HasColumnName("district");
@@ -389,10 +393,18 @@ public partial class CoopEducationDbContext : DbContext
             entity.Property(e => e.Province)
                 .HasMaxLength(50)
                 .HasColumnName("province");
+            entity.Property(e => e.Road)
+                .HasMaxLength(100)
+                .IsFixedLength()
+                .HasColumnName("road");
             entity.Property(e => e.StudentId).HasColumnName("student_id");
-            entity.Property(e => e.Subdistrict)
+            entity.Property(e => e.SubDistrict)
                 .HasMaxLength(50)
-                .HasColumnName("subdistrict");
+                .HasColumnName("sub_district");
+            entity.Property(e => e.VillageNo)
+                .HasMaxLength(100)
+                .IsFixedLength()
+                .HasColumnName("village_no");
 
             entity.HasOne(d => d.Student).WithOne(p => p.StudentAddress)
                 .HasForeignKey<StudentAddress>(d => d.StudentId)
