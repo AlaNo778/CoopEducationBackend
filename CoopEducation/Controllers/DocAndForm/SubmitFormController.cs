@@ -29,8 +29,14 @@ namespace CoopEducation.Controllers.DocAndForm
             int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
             string methodName = MethodOfLogSystem.POST.ToString();
             string roleName = _userService.GetClaimValue(ClaimTypes.Role);
-            string fileName = await _docService.UploadDoc(file, docId, roleName, userId);
-            if (fileName.Length < 0)
+            string uniqueName = _userService.GetClaimValue("unique_name");
+            bool existing = ValidateDocumentInDB(docId);
+            if (!existing)
+            {
+                return BadRequest("Failed to upload document");
+            }
+            string fileName = await _docService.UploadDoc(file, docId, roleName, userId,uniqueName);
+            if (string.IsNullOrEmpty(fileName))
             {
                 var errorLog = allServices.PrepareLog(
                       methodName,
@@ -57,6 +63,10 @@ namespace CoopEducation.Controllers.DocAndForm
                 allServices.SysApilogs(successLog);
                 return Ok(fileName + " uploaded successfully");
             }
+        }
+        private bool ValidateDocumentInDB(int docId)
+        {
+            return _context.DocumentTypes.Any(d => d.DocTypeId == docId);
         }
     }
 }
