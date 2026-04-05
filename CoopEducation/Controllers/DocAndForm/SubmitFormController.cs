@@ -1,5 +1,6 @@
 ﻿using CoopEducation.Models;
 using CoopEducation.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using static CoopEducation.Models.Constant.ConstantVariables;
@@ -23,6 +24,7 @@ namespace CoopEducation.Controllers.DocAndForm
             _userService = userService;
             _docService = docService;
         }
+        [Authorize(Roles = "student,teacher")]
         [HttpPost]
         public async Task<IActionResult> UploadDocument([FromForm] IFormFile file, [FromForm] int docId)
         {
