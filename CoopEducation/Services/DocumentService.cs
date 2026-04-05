@@ -55,7 +55,7 @@ namespace CoopEducation.Services
         {
             return _context.DocumentTypes.Where(d => d.DocTypeId == docId).Select(d => d.DocName).FirstOrDefault() ?? "SK01.pdf";
         }
-        public async Task<string> UploadDoc(IFormFile file, int docId, string roleName,int userId)
+        public async Task<string> UploadDoc(IFormFile file, int docId, string roleName,int userId,string uniqueName)
         {
             try
             {
@@ -69,7 +69,7 @@ namespace CoopEducation.Services
                 await supabaseClient.InitializeAsync();
                 var bucket = supabaseClient.Storage.From(GetbucketName(roleName));
                 string documentName = GetDocumentName(docId);
-                string fileName = $"{userId}_{documentName}";
+                string fileName = $"{userId}_{uniqueName}_{documentName}";
                 using var memoryStream = new MemoryStream();
                 await file.CopyToAsync(memoryStream);
                 var fileBytes = memoryStream.ToArray();
