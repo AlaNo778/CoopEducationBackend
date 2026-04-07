@@ -23,7 +23,9 @@ namespace CoopEducation.Models.Constant
             [Description("409")]
             MessageDataAlreadyExists,
             [Description("404")]
-            NotFound
+            NotFound,
+            [Description("401")]
+            Unauthorized,
 
         }
     }
