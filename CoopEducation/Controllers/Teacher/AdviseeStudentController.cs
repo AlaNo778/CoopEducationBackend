@@ -11,13 +11,13 @@ namespace CoopEducation.Controllers.Teacher
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class GetAdviseeStudentController : ControllerBase
+    public class AdviseeStudentController : ControllerBase
     {
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
         private readonly AllServices allServices;
         private readonly IUserService _userService;
-        public GetAdviseeStudentController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService)
+        public AdviseeStudentController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService)
         {
             _tokenService = tokenService;
             _context = context;
