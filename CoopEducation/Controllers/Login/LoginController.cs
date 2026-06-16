@@ -1,10 +1,11 @@
 ﻿using CoopEducation.Models;
 using CoopEducation.Models.DTO;
 using CoopEducation.Models.Request;
-using CoopEducation.Models.Response;
 using CoopEducation.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using static CoopEducation.Models.Constant.ConstantVariables;
@@ -27,6 +28,7 @@ namespace CoopEducation.Controllers.Login
             _userService = userService; 
         }
         [HttpPost("login")]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var user = await ValidateUser(request.Username, request.Password);
@@ -36,13 +38,6 @@ namespace CoopEducation.Controllers.Login
             }
             var accessToken = _tokenService.GenerateAccessToken(user.UserId, user.Username, user.RoleName);
             var csrfToken = _tokenService.GenerateCsrfToken();
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Path = "/"
-            };
             var oldToken = Request.Cookies["refresh_token"];
             if (!string.IsNullOrEmpty(oldToken))
             {
@@ -76,7 +71,14 @@ namespace CoopEducation.Controllers.Login
             }
             else
             {
-                Response.Cookies.Delete("refresh_token");
+                // ต้องส่ง CookieOptions ให้ตรงกับตอน set (SameSite=None, Secure=true, Path=/)
+                // มิฉะนั้น browser modern จะไม่ลบจริง แต่จะตีความเป็น "set cookie ค่าว่าง" แทน
+                Response.Cookies.Delete("refresh_token", new CookieOptions
+                {
+                    Path = "/",
+                    Secure = true,
+                    SameSite = SameSiteMode.None
+                });
             }
             await _context.SaveChangesAsync();
 
@@ -99,18 +101,13 @@ namespace CoopEducation.Controllers.Login
             string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
             SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "","Login successful", NSTools.GetEnumDescription(ResponseCode.Success) ?? "",user.UserId);
             allServices.SysApilogs(setLogDto);
-            return Ok(new AuthResponse
-            {
-                AccessToken = accessToken,
-                CsrfToken = csrfToken,
-                Role = user.RoleName,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes)
-            });
+            return NoContent();
         }
         [HttpPost("logout")]
+        [Authorize]
         public async Task<IActionResult> Logout()
         {
-            int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
+            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
             SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
             var refreshToken = Request.Cookies["refresh_token"];
@@ -125,9 +122,26 @@ namespace CoopEducation.Controllers.Login
                     await _context.SaveChangesAsync();
                 }
             }
-            Response.Cookies.Delete("access_token");
-            Response.Cookies.Delete("refresh_token");
-            Response.Cookies.Delete("csrf_token");
+            Response.Cookies.Delete("access_token", new CookieOptions
+            {
+                Path = "/",
+                Secure = true,
+                SameSite = SameSiteMode.None
+            });
+
+            Response.Cookies.Delete("refresh_token", new CookieOptions
+            {
+                Path = "/",
+                Secure = true,
+                SameSite = SameSiteMode.None
+            });
+
+            Response.Cookies.Delete("csrf_token", new CookieOptions
+            {
+                Path = "/",
+                Secure = true,
+                SameSite = SameSiteMode.None
+            });
             allServices.SysApilogs(setLogDto);
             return NoContent();
         }
@@ -136,35 +150,94 @@ namespace CoopEducation.Controllers.Login
         {
             try
             {
-                int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
                 string methodName = Convert.ToString(MethodOfLogSystem.POST) ?? string.Empty;
-                SetLogDTO setLogDto = allServices.PrepareLog(methodName, ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "", "", "", NSTools.GetEnumDescription(ResponseCode.Success) ?? "", userId);
-                var refreshToken = Request.Cookies["refresh_token"];
-                if (string.IsNullOrEmpty(refreshToken))
+
+                var oldRefreshToken = Request.Cookies["refresh_token"];
+                if (string.IsNullOrEmpty(oldRefreshToken))
                     return Unauthorized();
+
+                // หา token (ไม่ filter Revoked เพื่อจะได้ตรวจ reuse ได้)
                 var tokenEntity = await _context.RefreshTokens
                     .Include(t => t.User)
                     .ThenInclude(u => u.Role)
-                    .FirstOrDefaultAsync(t => t.Token == refreshToken && t.Revoked == false);
-                if (tokenEntity == null || tokenEntity.Expiry < DateTime.UtcNow)
+                    .FirstOrDefaultAsync(t => t.Token == oldRefreshToken);
+
+                if (tokenEntity == null)
                     return Unauthorized();
+
+                // === ตรวจ token reuse ===
+                // ถ้า token นี้ถูก revoke แล้ว แปลว่ามีคน replay (อาจเป็น attacker หลัง rotate แล้ว)
+                // → revoke ทุก active refresh token ของ user นี้ เพื่อบังคับ login ใหม่
+                if (tokenEntity.Revoked == true)
+                {
+                    var allActiveTokens = await _context.RefreshTokens
+                        .Where(t => t.UserId == tokenEntity.UserId && t.Revoked == false)
+                        .ToListAsync();
+                    foreach (var t in allActiveTokens) t.Revoked = true;
+                    await _context.SaveChangesAsync();
+
+                    SetLogDTO reuseLog = allServices.PrepareLog(methodName,
+                        ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
+                        "", "Refresh token reuse detected; all user sessions revoked",
+                        NSTools.GetEnumDescription(ResponseCode.Unauthorized) ?? "",
+                        tokenEntity.UserId);
+                    allServices.SysApilogs(reuseLog);
+                    return Unauthorized();
+                }
+
+                if (tokenEntity.Expiry < DateTime.UtcNow)
+                    return Unauthorized();
+
+                // === Rotation ===
+                tokenEntity.Revoked = true;
+
+                var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
+                var newRefreshEntity = new RefreshToken
+                {
+                    Token = newRefreshTokenValue,
+                    UserId = tokenEntity.UserId,
+                    Expiry = tokenEntity.Expiry,   // คงเวลาเดิม ไม่ต่อเพิ่ม (ยึดเจตนา remember me 7 วัน)
+                    CreatedAt = DateTime.UtcNow,
+                    Revoked = false
+                };
+                await _context.RefreshTokens.AddAsync(newRefreshEntity);
+
                 var newAccessToken = _tokenService.GenerateAccessToken(
                     tokenEntity.User.UserId,
                     tokenEntity.User.Username,
                     tokenEntity.User.Role.RoleName
                 );
+
+                await _context.SaveChangesAsync();
+
                 int accessTokenExpiryMinutes = int.TryParse(NSTools.GetAppConfig("AccessTokenExpiryMinutes"), out var m) ? m : 60;
                 Response.Cookies.Append("access_token", newAccessToken, new CookieOptions
                 {
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.None,
-                    Expires = DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes)
+                    Expires = DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes),
+                    Path = "/"
                 });
+                Response.Cookies.Append("refresh_token", newRefreshTokenValue, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Expires = tokenEntity.Expiry,
+                    Path = "/"
+                });
+
+                SetLogDTO setLogDto = allServices.PrepareLog(methodName,
+                    ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
+                    "", "Refresh rotated",
+                    NSTools.GetEnumDescription(ResponseCode.Success) ?? "",
+                    tokenEntity.UserId);
                 allServices.SysApilogs(setLogDto);
-                return Ok(new { accessToken = newAccessToken });
+
+                return NoContent();
             }
-            catch(Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500);
             }

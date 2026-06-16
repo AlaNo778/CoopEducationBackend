@@ -54,7 +54,12 @@ namespace CoopEducation.Services
         }
         public ClaimsPrincipal? ValidateToken(string token)
         {
-            var handler = new JwtSecurityTokenHandler();
+            var handler = new JwtSecurityTokenHandler
+            {
+                // ไม่แมป "sub" → ClaimTypes.NameIdentifier, "unique_name" → ClaimTypes.Name ฯลฯ
+                // เพื่อให้ชื่อ claim ยังคงเหมือนเดิมตามที่ตอน generate token
+                MapInboundClaims = false
+            };
             var key = Encoding.UTF8.GetBytes(NSTools.GetAppConfig("Key"));
             try
             {

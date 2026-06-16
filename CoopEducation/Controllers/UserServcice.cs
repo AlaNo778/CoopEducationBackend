@@ -1,5 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 
 namespace CoopEducation.Services
 {
@@ -12,27 +11,22 @@ namespace CoopEducation.Services
     public class UserService : IUserService
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ITokenService _tokenService;
 
-        public UserService(IHttpContextAccessor httpContextAccessor)
+        public UserService(IHttpContextAccessor httpContextAccessor, ITokenService tokenService)
         {
             _httpContextAccessor = httpContextAccessor;
+            _tokenService = tokenService;
         }
 
         public ClaimsPrincipal GetUser()
         {
             var token = GetTokenFromCookie();
             if (string.IsNullOrEmpty(token))
-                return new ClaimsPrincipal(); 
-
-            var handler = new JwtSecurityTokenHandler();
-
-            if (!handler.CanReadToken(token))
                 return new ClaimsPrincipal();
 
-            var jsonToken = handler.ReadJwtToken(token);
-            var claims = jsonToken?.Claims ?? Enumerable.Empty<Claim>();
-
-            return new ClaimsPrincipal(new ClaimsIdentity(claims));
+            var principal = _tokenService.ValidateToken(token);
+            return principal ?? new ClaimsPrincipal();
         }
 
         public string GetClaimValue(string claimType)

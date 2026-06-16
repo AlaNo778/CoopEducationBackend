@@ -1,11 +1,7 @@
 ﻿using CoopEducation.Controllers;
 using CoopEducation.Models;
 using CoopEducation.Models.DTO;
-using CoopEducation.Models.Request;
-using Microsoft.AspNetCore.Mvc;
-using Supabase;
-using Supabase.Storage;
-using System.Reflection;
+using System.IO.Compression;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
 namespace CoopEducation.Services
@@ -29,23 +25,25 @@ namespace CoopEducation.Services
                     string supabaseKey = GetSupabaseKey();
                     var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
                     string documentName = GetDocumentName(docRequest);
+
                     await supabaseClient.InitializeAsync();
                     var bucket = supabaseClient.Storage.From("TemplateDocument");
+
                     var signedUrl = await bucket.CreateSignedUrl(documentName, 300);
                     signedUrl = signedUrl.TrimEnd('?');
+
                     using var httpClient = new HttpClient();
                     var fileBytes = await httpClient.GetByteArrayAsync(signedUrl);
                     return new MemoryStream(fileBytes);
-                    //Console.WriteLine(signedUrl);
-                    //return new MemoryStream();
+
                 }
-                else
-                {
-                    return null!;
-                }
+                return null!;
             }
             catch (Exception ex)
             {
+
+                Console.WriteLine($"[ERROR] GetDocuments failed: {ex.Message}");
+                Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
                 var logs = _allServices.PrepareLog("DocumentService", "", docRequest.ToString(), ex.ToString(), "", userId);
                 _allServices.SysApilogs(logs);
                 return null!;
@@ -53,7 +51,7 @@ namespace CoopEducation.Services
         }
         private string GetDocumentName(int docId)
         {
-            return _context.DocumentTypes.Where(d => d.DocTypeId == docId).Select(d => d.DocName).FirstOrDefault() ?? "SK01.pdf";
+            return _context.DocumentTypes.Where(d => d.DocTypeId == docId).Select(d => d.DocName).FirstOrDefault() ?? "Sc01.pdf";
         }
         public async Task<string> UploadDoc(IFormFile file, int docId, string roleName,int userId,string uniqueName)
         {
@@ -104,5 +102,69 @@ namespace CoopEducation.Services
         {
             return roleName == "student" ? "StudentsSubmittedDocument" : "TeacherSubmittedDocument";
         }
+        public async Task<Stream> GetAllDocumentsByRole(string roleName, int userId)
+        {
+            try
+            {
+                List<int> docIds = GetDocIdsByRole(roleName);
+                if (docIds == null || docIds.Count == 0)
+                    return null!;
+                string supabaseUrl = GetSupabaseUrl();
+                string supabaseKey = GetSupabaseKey();
+                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
+                await supabaseClient.InitializeAsync();
+                var bucket = supabaseClient.Storage.From("TemplateDocument");
+
+                var zipStream = new MemoryStream();
+
+                using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+                {
+                    using var httpClient = new HttpClient();
+
+                    foreach (var docId in docIds)
+                    {
+                        string documentName = GetDocumentName(docId);
+                        if (string.IsNullOrEmpty(documentName)) continue;
+
+                        try
+                        {
+                            var signedUrl = await bucket.CreateSignedUrl(documentName, 300);
+                            signedUrl = signedUrl.TrimEnd('?');
+
+                            var fileBytes = await httpClient.GetByteArrayAsync(signedUrl);
+
+                            var entry = archive.CreateEntry(documentName, CompressionLevel.Fastest);
+                            using var entryStream = entry.Open();
+                            await entryStream.WriteAsync(fileBytes, 0, fileBytes.Length);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[WARN] Skip file {documentName}: {ex.Message}");
+                        }
+                    }
+                }
+                zipStream.Position = 0;
+                return zipStream;
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"[ERROR] GetDocumentsByRole failed: {ex.Message}");
+                var logs = _allServices.PrepareLog("DocumentService", "", roleName.ToString(), ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
+                _allServices.SysApilogs(logs);
+                return null!;
+            }
+        }
+        private List<int> GetDocIdsByRole(string roleName)
+        {
+            return roleName switch
+            {
+                "student" => new List<int> { 1, 3, 4, 11, 12, 13, 14, 15, 31},
+                "teacher" => new List<int> { 6, 7, 8, 9, 10},
+                "staff" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31},
+                "admin" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31 },
+                _ => new List<int>()
+            };
+        }
+
     }
 }
