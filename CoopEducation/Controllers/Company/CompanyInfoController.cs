@@ -1,10 +1,12 @@
 ﻿using CoopEducation.Models;
 using CoopEducation.Models.DTO;
+using CoopEducation.Models.Response;
 using CoopEducation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using static CoopEducation.Models.Constant.ConstantVariables;
 
-namespace CoopEducation.Controllers.User
+namespace CoopEducation.Controllers.Company
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -19,10 +21,11 @@ namespace CoopEducation.Controllers.User
             _context = context;
             allServices = new(_context, _tokenService);
         }
-        public async Task<List<CompanyInfoDTO>> GetCompanyInfo()
+        [HttpGet]
+        public async Task<ResponseMessage<List<CompanyInfoDTO>>> GetCompanyInfo()
         {
             var companyInfo = await allServices.GetCompanyInfo();
-            return companyInfo;
+            return allServices.WriteResponse(companyInfo, "Company info retrieved successfully", (NSTools.GetEnumDescription(ResponseCode.Success)!), false);
         }
     }
 }

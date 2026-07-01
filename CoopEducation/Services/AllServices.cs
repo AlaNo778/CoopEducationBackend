@@ -322,6 +322,109 @@ namespace CoopEducation.Services
                     CompanyName = c.CompanyName
                 }).ToListAsync();
         }
-         
-    }
-}
+        public async Task<(bool success, string message)> UpdateMentorAsync(int userId, UpdateAndAssignMentorDTO mentorDto)
+        {
+            Mentor mentor = new Mentor
+            {
+                MentorId = mentorDto.MentorId,
+                FirstName = mentorDto.FirstName,
+                LastName = mentorDto.LastName,
+                Position = mentorDto.Position,
+                Department = mentorDto.Department,
+                Phone = mentorDto.Phone,
+                Email = mentorDto.Email
+            };
+            var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student == null)
+            {
+                return (false, "Student not found.");
+            }
+            var coopPlacement = await _context.CoopPlacements.FirstOrDefaultAsync(cp => cp.StudentId == student.StudentId);
+            if (coopPlacement == null)
+            {
+                return (false, "Coop placement not found for the student.");
+            }
+            var existingMentor = await _context.Mentors.FirstOrDefaultAsync(m => m.MentorId == coopPlacement.MentorId);
+            if (existingMentor == null)
+            {
+                return (false, "Mentor not found.");
+            }
+            existingMentor.FirstName = mentor.FirstName;
+            existingMentor.LastName = mentor.LastName;
+            existingMentor.Position = mentor.Position;
+            existingMentor.Department = mentor.Department;
+            existingMentor.Phone = mentor.Phone;
+            existingMentor.Email = mentor.Email;
+            try
+            {
+                await _context.SaveChangesAsync();
+                return (true, "Mentor updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"An error occurred while updating the mentor: {ex.Message}");
+            }
+        }
+        public async Task<(bool success, string message)> AssignMentor(int userId , UpdateAndAssignMentorDTO mentorDto)
+        {
+            Mentor mentor = new Mentor
+            {
+                MentorId = mentorDto.MentorId,
+                CompanyId = mentorDto.CompanyId,
+                FirstName = mentorDto.FirstName,
+                LastName = mentorDto.LastName,
+                Position = mentorDto.Position,
+                Department = mentorDto.Department,
+                Phone = mentorDto.Phone,
+                Email = mentorDto.Email
+            };
+            var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student == null)
+            {
+                return (false, "Student not found.");
+            }
+            var coopPlacement = await _context.CoopPlacements.FirstOrDefaultAsync(cp => cp.StudentId == student.StudentId);
+            if (coopPlacement == null)
+            {
+                return (false, "Coop placement not found for the student.");
+            }
+            var existingMentor = await _context.Mentors.FirstOrDefaultAsync(m => m.MentorId == coopPlacement.MentorId);
+            if (existingMentor == null)
+            {
+                var newMentor = new Mentor
+                {
+                    CompanyId = coopPlacement.CompanyId,
+                    FirstName = mentor.FirstName,
+                    LastName = mentor.LastName,
+                    Position = mentor.Position,
+                    Department = mentor.Department,
+                    Phone = mentor.Phone,
+                    Email = mentor.Email
+                };
+                _context.Mentors.Add(newMentor);
+                await _context.SaveChangesAsync();
+                coopPlacement.MentorId = newMentor.MentorId;
+                await _context.SaveChangesAsync();
+                return (true, "Assign mentor successfully");
+            }
+            return (false, "Mentor already assigned.");
+
+        }
+        public async Task<List<MentorDTO>> GetMentorsByCompanyId(int companyId)
+        {
+            var mentors = await _context.Mentors
+                .Where(m => m.CompanyId == companyId)
+                .Select(m => new MentorDTO
+                {
+                    MentorId = m.MentorId,
+                    FirstName = m.FirstName,
+                    LastName = m.LastName,
+                    Position = m.Position,
+                    Department = m.Department,
+                    MentorPhone = m.Phone,
+                    MentorEmail = m.Email
+                })
+                .ToListAsync();
+            return mentors;
+        }
+}}
