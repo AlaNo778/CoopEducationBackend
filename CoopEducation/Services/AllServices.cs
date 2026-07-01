@@ -427,4 +427,33 @@ namespace CoopEducation.Services
                 .ToListAsync();
             return mentors;
         }
+        public async Task<(bool success, string message)> AddCompanyAsync(int userId, CompanyDTO companyDto)
+        {
+            try
+            {
+                var existingCompany = await _context.Companies
+                    .FirstOrDefaultAsync(c => c.CompanyName == companyDto.CompanyName);
+                if (existingCompany != null)
+                {
+                    return (false, "Company already exists.");
+                }
+                var newCompany = new Company
+                {
+                    CompanyName = companyDto.CompanyName,
+                    Phone = companyDto.Phone,
+                    Fax = companyDto.Fax,
+                    Email = companyDto.Email,
+                    HrName = companyDto.HrName,
+                    Address = companyDto.Address,
+                    CreateAd = DateTime.Now
+                };
+                _context.Companies.Add(newCompany);
+                await _context.SaveChangesAsync();
+                return (true, "Company added successfully.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"An error occurred while adding the company: {ex.Message}");
+            }
+        }
 }}
