@@ -1,6 +1,8 @@
 ﻿using CoopEducation.Models;
 using CoopEducation.Models.DTO;
 using CoopEducation.Models.Response;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics.Eventing.Reader;
 
@@ -102,6 +104,12 @@ namespace CoopEducation.Services
                                      join a in _context.StudentAddresses on s.StudentId equals a.StudentId into sa
                                      from StudentAddress in sa.DefaultIfEmpty()
 
+                                     join ad in _context.Advisorships on s.StudentId equals ad.StudentId into sad
+                                     from Advisorships in sad.DefaultIfEmpty()
+
+                                     join t in _context.Teachers on Advisorships.TeacherId equals t.TeacherId into ta
+                                     from Teacher in ta.DefaultIfEmpty()
+
                                      where s.UserId == userId
                                      select new StudentInfoDTO
                                      {
@@ -125,7 +133,8 @@ namespace CoopEducation.Services
                                          Province = StudentAddress != null ? StudentAddress.Province : null,
                                          Road = StudentAddress != null ? StudentAddress.Road : null,
                                          SubDistrict = StudentAddress != null ? StudentAddress.SubDistrict : null,
-                                         VillageNo = StudentAddress != null ? StudentAddress.VillageNo : null
+                                         VillageNo = StudentAddress != null ? StudentAddress.VillageNo : null,
+                                         Advisor = Teacher != null ? Teacher.FirstName + " " + Teacher.LastName : null,
                                      }).FirstOrDefaultAsync();
             return studentInfo;
         }
@@ -252,5 +261,67 @@ namespace CoopEducation.Services
             return null;
 
         }
+        public async Task<List<MajorDTO>> GetMajors()
+        {
+            return await _context.Majors
+                .Select(m => new MajorDTO
+                {
+                    MajorId = m.MajorId,
+                    MajorName = m.MajorName
+                })
+                .ToListAsync();
+        }
+
+        public async Task<CoopAndMentorInfoDTO?> GetStudentCoopInfo(int userId)
+        {
+            var studentCoopInfo = await _context.Students
+                    .Where(s => s.UserId == userId)
+                    .Select(s => new CoopAndMentorInfoDTO
+                    {
+                        StudentId = s.StudentId,
+                        Coop = s.CoopPlacements
+                            .Select(cp => new CoopPlacementDTO
+                            {
+                                CompanyId = cp.CompanyId,
+                                CompanyName = cp.Company.CompanyName,
+                                CompanyPhone = cp.Company.Phone,
+                                CompanyFax = cp.Company.Fax,
+                                CompanyEmail = cp.Company.Email,
+                                HrName = cp.Company.HrName,
+                                Address = cp.Company.Address,
+
+                                JobTitle = cp.JobTitle,
+                                JobDescription = cp.JobDescription,
+                                StartDate = cp.StartDate,
+                                EndDate = cp.EndDate,
+                                AcademicYear = cp.AcademicYear,
+
+                                Mentor = cp.Mentor == null ? null : new MentorDTO
+                                {
+                                    MentorId = cp.Mentor.MentorId,
+                                    FirstName = cp.Mentor.FirstName,
+                                    LastName = cp.Mentor.LastName,
+                                    Position = cp.Mentor.Position,
+                                    Department = cp.Mentor.Department,
+                                    MentorPhone = cp.Mentor.Phone,
+                                    MentorEmail = cp.Mentor.Email,
+                                }
+                            })
+                            .FirstOrDefault() // null ถ้าไม่มี coop_placement
+                    })
+                    .FirstOrDefaultAsync(); // null ถ้าไม่เจอ student
+
+                        return studentCoopInfo;
+        }
+        public async Task<List<CompanyInfoDTO>> GetCompanyInfo()
+        {
+            return await _context.Companies
+                .Select(c => new CompanyInfoDTO
+                {
+                    CompanyId = c.CompanyId,
+                    CompanyName = c.CompanyName
+                }).ToListAsync();
+        }
+         
     }
 }

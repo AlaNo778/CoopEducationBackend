@@ -23,5 +23,6 @@
         public string? PhoneMobile { get; set; }
         public string? Facebook { get; set; }
         public string? LineId { get; set; }
+        public string? Advisor { get; set; }
     }
 }

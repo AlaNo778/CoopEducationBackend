@@ -19,6 +19,7 @@ builder.Services.AddScoped<AllServices>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IStudentUpdateService, StudentUpdateService>();
 builder.Services.AddDbContext<CoopEducationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services

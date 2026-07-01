@@ -88,7 +88,7 @@ public partial class CoopEducationDbContext : DbContext
 
             entity.Property(e => e.LogId).HasColumnName("log_id");
             entity.Property(e => e.ApiEndpoint)
-                .HasMaxLength(30)
+                .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("api_endpoint");
             entity.Property(e => e.CreateAt)

@@ -1,6 +1,8 @@
 ﻿using CoopEducation.Controllers;
 using CoopEducation.Models;
 using CoopEducation.Models.DTO;
+using Microsoft.EntityFrameworkCore;
+using Supabase.Gotrue;
 using System.IO.Compression;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
@@ -61,22 +63,26 @@ namespace CoopEducation.Services
                 {
                     return string.Empty;
                 }
+
                 string supabaseUrl = GetSupabaseUrl();
                 string supabaseKey = GetSupabaseKey();
                 var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
                 await supabaseClient.InitializeAsync();
                 var bucket = supabaseClient.Storage.From(GetbucketName(roleName));
                 string documentName = GetDocumentName(docId);
-                string fileName = $"{userId}_{uniqueName}_{documentName}";
+
+                string folderName = $"{userId}_{uniqueName}";
+                string filePath = $"{folderName}/{documentName}";
+
                 using var memoryStream = new MemoryStream();
                 await file.CopyToAsync(memoryStream);
                 var fileBytes = memoryStream.ToArray();
-                var response = await bucket.Upload(fileBytes, fileName, new Supabase.Storage.FileOptions { Upsert = true });
+                var response = await bucket.Upload(fileBytes, filePath, new Supabase.Storage.FileOptions { Upsert = true });
                 if (response != null)
                 {
-                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName,userId,docId,fileName);
+                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName,userId,docId,filePath);
                     _allServices.SysDocLogs(logDoc);
-                    return fileName;
+                    return filePath;
                 }
                 else
                 {
@@ -85,7 +91,7 @@ namespace CoopEducation.Services
             }
             catch (Exception ex)
             {
-                var logs = _allServices.PrepareLog("DocumentService", "", "", ex.ToString(), "", userId);
+                var logs = _allServices.PrepareLog("DocumentService", "", "", ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
                 _allServices.SysApilogs(logs);
                 return string.Empty;
             }
@@ -164,6 +170,30 @@ namespace CoopEducation.Services
                 "admin" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31 },
                 _ => new List<int>()
             };
+        }
+        public async Task<List<int?>> GetexistDoc(int userId)
+        {
+            int studentId = await _context.Students
+                .Where(x => x.UserId == userId)
+                .Select(x => x.StudentId)
+                .FirstOrDefaultAsync();
+
+            List<int?> exist = _context.StudentDocuments
+                .Where(x => x.StudentId == studentId)
+                .Select(x => new { x.DocTypeId, x.UploadedAt })
+                .AsEnumerable()
+                .GroupBy(x => x.DocTypeId)
+                .Select(g => g.OrderByDescending(x => x.UploadedAt).First())
+                .Select(x => (int?)x.DocTypeId)
+                .Cast<int?>()
+                .ToList();
+
+            if (exist.Count == 0)
+            {
+                return new List<int?>();
+            }
+
+            return exist;
         }
 
     }
