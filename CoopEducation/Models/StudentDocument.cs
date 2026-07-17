@@ -19,6 +19,8 @@ public partial class StudentDocument
 
     public DateTime? UploadedAt { get; set; }
 
+    public string? RealFileName { get; set; }
+
     public virtual DocumentType? DocType { get; set; }
 
     public virtual CoopPlacement? Placement { get; set; }

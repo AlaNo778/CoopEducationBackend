@@ -10,20 +10,21 @@ namespace CoopEducation.Controllers.Company
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class CompanyInfoController : ControllerBase
+    public class CompanyListController : ControllerBase
     {
         private readonly AllServices allServices;
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
-        public CompanyInfoController(ITokenService tokenService, CoopEducationDbContext context) 
+        public CompanyListController(ITokenService tokenService, CoopEducationDbContext context) 
         {
             _tokenService = tokenService;
             _context = context;
             allServices = new(_context, _tokenService);
         }
         [HttpGet]
-        public async Task<ResponseMessage<List<CompanyInfoDTO>>> GetCompanyInfo()
-        {
+        public async Task<ResponseMessage<List<CompanyInfoDTO>>> GetCompanyList()
+
+         {
             var companyInfo = await allServices.GetCompanyInfo();
             return allServices.WriteResponse(companyInfo, "Company info retrieved successfully", (NSTools.GetEnumDescription(ResponseCode.Success)!), false);
         }

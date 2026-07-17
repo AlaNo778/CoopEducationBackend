@@ -5,31 +5,31 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
-namespace CoopEducation.Controllers.Company
+namespace CoopEducation.Controllers.CoopPlacements
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class MentorManagementController : ControllerBase
+    public class CoopPlacementManagementController : ControllerBase
     {
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
         private readonly AllServices _allServices;
         private readonly IUserService _userService;
-        public MentorManagementController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService)
+        public CoopPlacementManagementController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService)
         {
             _tokenService = tokenService;
             _context = context;
             _allServices = new(context, tokenService);
             _userService = userService;
         }
-        [HttpPut]
-        public async Task<IActionResult> UpdateMentor([FromBody] UpdateAndAssignMentorDTO mentor)
+        [HttpPost]
+        public async Task<IActionResult> AssignPlacement([FromBody] AssignCompanyDTO assignCompanyDTO)
         {
-            var methodName = nameof(UpdateMentor);
+            var methodName = nameof(AssignPlacement);
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             try
             {
-                var (success, message) = await _allServices.UpdateMentorAsync(userId, mentor);
+                var (success, message) = await _allServices.AssignCompanyToStudentAsync(userId, assignCompanyDTO);
                 var log = _allServices.PrepareLog(
                     methodName,
                     ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
@@ -54,17 +54,17 @@ namespace CoopEducation.Controllers.Company
                     userId
                 );
                 _allServices.SysApilogs(errorLog);
-                return StatusCode(500, new { isError = true, message = "An error occurred while updating the mentor." });
+                return StatusCode(500, new { isError = true, message = "An error occurred while assigning the company to the student." });
             }
         }
-        [HttpPost]
-        public async Task<IActionResult> AddMentor([FromBody] UpdateAndAssignMentorDTO mentor)
+        [HttpPut]
+        public async Task<IActionResult> UpdatePlacement([FromBody] AssignCompanyDTO data)
         {
-            var methodName = nameof(AddMentor);
+            var methodName = nameof(UpdatePlacement);
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             try
             {
-                var (success, message, mentorId) = await _allServices.AssignMentor(userId, mentor);
+                var (success, message) = await _allServices.UpdateStudentCoopPlacementAsync(userId, data);
                 var log = _allServices.PrepareLog(
                     methodName,
                     ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
@@ -75,7 +75,7 @@ namespace CoopEducation.Controllers.Company
                 );
                 _allServices.SysApilogs(log);
                 return success
-                    ? Ok(new { isError = false, message, mentorId })
+                    ? Ok(new { isError = false, message })
                     : BadRequest(new { isError = true, message });
             }
             catch (Exception ex)
@@ -89,7 +89,8 @@ namespace CoopEducation.Controllers.Company
                     userId
                 );
                 _allServices.SysApilogs(errorLog);
-                return StatusCode(500, new { isError = true, message = "An error occurred while adding the mentor." });
+                return StatusCode(500, new { isError = true, message = "An error occurred while updating the student's coop placement." });
             }
         }
-}}
+    }
+}

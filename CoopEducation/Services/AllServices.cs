@@ -78,7 +78,7 @@ namespace CoopEducation.Services
             int studentId = GetStudentId(userId);
             return _context.CoopPlacements.Where(c => c.StudentId == studentId).Select(s => s.PlacementId).FirstOrDefault().ToString() ?? "";
         }
-        private int GetStudentId(int userId)
+        public int GetStudentId(int userId)
         {
             return _context.Students.Where(s => s.UserId == userId).Select(s => s.StudentId).FirstOrDefault();
         }
@@ -365,7 +365,7 @@ namespace CoopEducation.Services
                 return (false, $"An error occurred while updating the mentor: {ex.Message}");
             }
         }
-        public async Task<(bool success, string message)> AssignMentor(int userId , UpdateAndAssignMentorDTO mentorDto)
+        public async Task<(bool success, string message, int? mentorId)> AssignMentor(int userId , UpdateAndAssignMentorDTO mentorDto)
         {
             Mentor mentor = new Mentor
             {
@@ -381,12 +381,12 @@ namespace CoopEducation.Services
             var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
             if (student == null)
             {
-                return (false, "Student not found.");
+                return (false, "Student not found.",null);
             }
             var coopPlacement = await _context.CoopPlacements.FirstOrDefaultAsync(cp => cp.StudentId == student.StudentId);
             if (coopPlacement == null)
             {
-                return (false, "Coop placement not found for the student.");
+                return (false, "Coop placement not found for the student.",null);
             }
             var existingMentor = await _context.Mentors.FirstOrDefaultAsync(m => m.MentorId == coopPlacement.MentorId);
             if (existingMentor == null)
@@ -405,9 +405,10 @@ namespace CoopEducation.Services
                 await _context.SaveChangesAsync();
                 coopPlacement.MentorId = newMentor.MentorId;
                 await _context.SaveChangesAsync();
-                return (true, "Assign mentor successfully");
+                int? id = await GetMentorIdAAafterInsert(mentorDto);
+                return (true, "Assign mentor successfully",id);
             }
-            return (false, "Mentor already assigned.");
+            return (false, "Mentor already assigned.",null);
 
         }
         public async Task<List<MentorDTO>> GetMentorsByCompanyId(int companyId)
@@ -427,7 +428,7 @@ namespace CoopEducation.Services
                 .ToListAsync();
             return mentors;
         }
-        public async Task<(bool success, string message)> AddCompanyAsync(int userId, CompanyDTO companyDto)
+        public async Task<(bool success, string message, int? companyId)> AddCompanyAsync(int userId, CompanyDTO companyDto)
         {
             try
             {
@@ -435,7 +436,7 @@ namespace CoopEducation.Services
                     .FirstOrDefaultAsync(c => c.CompanyName == companyDto.CompanyName);
                 if (existingCompany != null)
                 {
-                    return (false, "Company already exists.");
+                    return (false, "Company already exists.", null);
                 }
                 var newCompany = new Company
                 {
@@ -445,15 +446,130 @@ namespace CoopEducation.Services
                     Email = companyDto.Email,
                     HrName = companyDto.HrName,
                     Address = companyDto.Address,
-                    CreateAd = DateTime.Now
+                    CreateAt = DateTime.Now
                 };
                 _context.Companies.Add(newCompany);
                 await _context.SaveChangesAsync();
-                return (true, "Company added successfully.");
+                int? id = await GetCompanyIdAfterInsert(companyDto);
+                return (true, "Company added successfully.",id);
             }
             catch (Exception ex)
             {
-                return (false, $"An error occurred while adding the company: {ex.Message}");
+                return (false, $"An error occurred while adding the company: {ex.Message}",null);
             }
         }
-}}
+        public async Task<(bool success, string message)> UpdateCompanyAsync(int userId, CompanyDTO companyDto)
+        {
+            try
+            {
+                var existingCompany = await _context.Companies
+                    .FirstOrDefaultAsync(c => c.CompanyId == companyDto.CompanyId);
+                if (existingCompany == null)
+                {
+                    return (false, "Company not found.");
+                }
+                existingCompany.Phone = companyDto.Phone;
+                existingCompany.Fax = companyDto.Fax;
+                existingCompany.Email = companyDto.Email;
+                existingCompany.HrName = companyDto.HrName;
+                existingCompany.Address = companyDto.Address;
+                existingCompany.ModifiedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+                return (true, "Company updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"An error occurred while updating the company: {ex.Message}");
+            }
+        }
+        public async Task<(bool success, string message)> AssignCompanyToStudentAsync(int userId, AssignCompanyDTO assignCompanyDTO)
+        {
+            try
+            {
+                var student = await _context.Students
+                    .FirstOrDefaultAsync(s => s.UserId == userId);
+
+                if (student == null)
+                    return (false, "Student not found.");
+
+                var existingPlacement = await _context.CoopPlacements
+                    .FirstOrDefaultAsync(cp => cp.StudentId == student.StudentId);
+
+                if (existingPlacement != null)
+                    return (false, "Student already has a coop placement.");
+
+                var newPlacement = new CoopPlacement
+                {
+                    StudentId = student.StudentId,
+                    CompanyId = assignCompanyDTO.CompanyId,
+                    MentorId = assignCompanyDTO.MentorId,
+                    JobTitle = assignCompanyDTO.JobTitle,
+                    JobDescription = assignCompanyDTO.JobDescription,
+                    StartDate = assignCompanyDTO.StartDate,
+                    EndDate = assignCompanyDTO.EndDate,
+                    AcademicYear = assignCompanyDTO.AcademicYear,
+                };
+
+                await _context.CoopPlacements.AddAsync(newPlacement);
+                await _context.SaveChangesAsync();
+
+                return (true, "Company assigned to student successfully.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"An error occurred: {ex.Message}");
+            }
+        }
+        public async Task<(bool success, string message)> UpdateStudentCoopPlacementAsync(int userId, AssignCompanyDTO data)
+        {
+            try
+            {
+                var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+                if (student == null)
+                {
+                    return (false, "Student not found.");
+                }
+                var coopPlacement = await _context.CoopPlacements.FirstOrDefaultAsync(cp => cp.StudentId == student.StudentId);
+                if (coopPlacement == null)
+                {
+                    return (false, "Coop placement not found for the student.");
+                }
+                coopPlacement.CompanyId = data.CompanyId;
+                coopPlacement.MentorId = data.MentorId;
+                coopPlacement.JobTitle = data.JobTitle;
+                coopPlacement.JobDescription = data.JobDescription;
+                coopPlacement.StartDate = data.StartDate;
+                coopPlacement.EndDate = data.EndDate;
+                coopPlacement.AcademicYear = data.AcademicYear;
+                await _context.SaveChangesAsync();
+                return (true, "Student's coop placement updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"An error occurred while updating the student's coop placement: {ex.Message}");
+            }
+           
+        }
+        public async Task<int?> GetMentorIdAAafterInsert(UpdateAndAssignMentorDTO mentor)
+        {
+            var mentorEntity = await _context.Mentors.FirstOrDefaultAsync(m =>
+                    m.FirstName == mentor.FirstName &&
+                    m.LastName == mentor.LastName &&
+                    m.Position == mentor.Position &&
+                    m.Department == mentor.Department
+                );
+
+            int? id = mentorEntity?.MentorId;
+            return id;
+        }
+        public async Task<int?> GetCompanyIdAfterInsert(CompanyDTO companyDto)
+        {
+            var companyEntity = await _context.Companies.FirstOrDefaultAsync(c =>
+                c.CompanyName == companyDto.CompanyName &&
+                c.Email == companyDto.Email
+            );
+            int? id = companyEntity?.CompanyId;
+            return id;
+        }
+    }
+}

@@ -19,7 +19,9 @@ public partial class Company
 
     public string? Address { get; set; }
 
-    public DateTime? CreateAd { get; set; }
+    public DateTime? CreateAt { get; set; }
+
+    public DateTime? ModifiedAt { get; set; }
 
     public virtual ICollection<CoopPlacement> CoopPlacements { get; set; } = new List<CoopPlacement>();
 

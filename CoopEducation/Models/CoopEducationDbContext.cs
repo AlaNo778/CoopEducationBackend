@@ -89,7 +89,6 @@ public partial class CoopEducationDbContext : DbContext
             entity.Property(e => e.LogId).HasColumnName("log_id");
             entity.Property(e => e.ApiEndpoint)
                 .HasMaxLength(255)
-                .IsUnicode(false)
                 .HasColumnName("api_endpoint");
             entity.Property(e => e.CreateAt)
                 .HasColumnType("datetime")
@@ -124,9 +123,9 @@ public partial class CoopEducationDbContext : DbContext
             entity.Property(e => e.CompanyName)
                 .HasMaxLength(200)
                 .HasColumnName("company_name");
-            entity.Property(e => e.CreateAd)
+            entity.Property(e => e.CreateAt)
                 .HasColumnType("datetime")
-                .HasColumnName("create_ad");
+                .HasColumnName("create_at");
             entity.Property(e => e.Email)
                 .HasMaxLength(150)
                 .IsUnicode(false)
@@ -138,6 +137,9 @@ public partial class CoopEducationDbContext : DbContext
             entity.Property(e => e.HrName)
                 .HasMaxLength(100)
                 .HasColumnName("hr_name");
+            entity.Property(e => e.ModifiedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("modified_at");
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -458,6 +460,10 @@ public partial class CoopEducationDbContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("file_size");
             entity.Property(e => e.PlacementId).HasColumnName("placement_id");
+            entity.Property(e => e.RealFileName)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("real_file_name");
             entity.Property(e => e.StudentId).HasColumnName("student_id");
             entity.Property(e => e.UploadedAt)
                 .HasColumnType("datetime")

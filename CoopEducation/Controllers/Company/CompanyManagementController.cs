@@ -9,13 +9,13 @@ namespace CoopEducation.Controllers.Company
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class CompanyAddController : ControllerBase
+    public class CompanyManagementController : ControllerBase
     {
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
         private readonly AllServices _allServices;
         private readonly IUserService _userService;
-        public CompanyAddController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService)
+        public CompanyManagementController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService)
         {
             _tokenService = tokenService;
             _context = context;
@@ -29,7 +29,41 @@ namespace CoopEducation.Controllers.Company
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             try
             {
-                var (success, message) = await _allServices.AddCompanyAsync(userId, company);
+                var (success, message, companyId) = await _allServices.AddCompanyAsync(userId, company);
+                var log = _allServices.PrepareLog(
+                    methodName,
+                    ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
+                    userId.ToString(),
+                    message,
+                    NSTools.GetEnumDescription(success ? ResponseCode.Success : ResponseCode.Incorrect) ?? "",
+                    userId
+                );
+                _allServices.SysApilogs(log);
+                return success
+                    ? Ok(new { isError = false, message, companyId })
+                    : BadRequest(new { isError = true, message });
+            }
+            catch (Exception ex)
+            {
+                var errorLog = _allServices.PrepareLog(
+                    methodName,
+                    ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
+                    userId.ToString(),
+                    ex.Message,
+                    NSTools.GetEnumDescription(ResponseCode.Error) ?? "",
+                    userId
+                );
+                _allServices.SysApilogs(errorLog);
+                return StatusCode(500, new { isError = true, message = "An error occurred while adding the company." });
+            }
+        }
+        public async Task<IActionResult> UpdateCompany([FromBody] CompanyDTO company)
+        {
+            var methodName = nameof(UpdateCompany);
+            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
+            try
+            {
+                var (success, message) = await _allServices.UpdateCompanyAsync(userId, company);
                 var log = _allServices.PrepareLog(
                     methodName,
                     ControllerContext.ActionDescriptor.AttributeRouteInfo?.Template ?? "",
@@ -54,8 +88,7 @@ namespace CoopEducation.Controllers.Company
                     userId
                 );
                 _allServices.SysApilogs(errorLog);
-                return StatusCode(500, new { isError = true, message = "An error occurred while adding the company." });
+                return StatusCode(500, new { isError = true, message = "An error occurred while updating the company." });
             }
-        }
     }
-}
+}}
