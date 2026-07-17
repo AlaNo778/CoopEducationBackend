@@ -195,6 +195,48 @@ namespace CoopEducation.Services
 
             return exist;
         }
+        public async Task<string> UploadReport(IFormFile file, int docId, string roleName, int userId, string uniqueName)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return string.Empty;
+                }
+
+                string supabaseUrl = GetSupabaseUrl();
+                string supabaseKey = GetSupabaseKey();
+                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
+                await supabaseClient.InitializeAsync();
+
+                var bucket = supabaseClient.Storage.From("StudentReport");
+                string documentName = GetDocumentName(docId);
+
+                string folderName = $"{userId}_{uniqueName}";
+                string filePath = $"{folderName}/{documentName}";
+
+                using var memoryStream = new MemoryStream();
+                await file.CopyToAsync(memoryStream);
+                var fileBytes = memoryStream.ToArray();
+                var response = await bucket.Upload(fileBytes, filePath, new Supabase.Storage.FileOptions { Upsert = true });
+                if (response != null)
+                {
+                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName, userId, docId, filePath);
+                    _allServices.SysDocLogs(logDoc);
+                    return filePath;
+                }
+                else
+                {
+                    return string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                var logs = _allServices.PrepareLog("DocumentService", "", "", ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
+                _allServices.SysApilogs(logs);
+                return string.Empty;
+            }
+        }
 
     }
 }
