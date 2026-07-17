@@ -3,6 +3,7 @@ using CoopEducation.Models;
 using CoopEducation.Models.DTO;
 using Microsoft.EntityFrameworkCore;
 using Supabase.Gotrue;
+using Supabase.Interfaces;
 using System.IO.Compression;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
@@ -235,6 +236,44 @@ namespace CoopEducation.Services
                 var logs = _allServices.PrepareLog("DocumentService", "", "", ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
                 _allServices.SysApilogs(logs);
                 return string.Empty;
+            }
+        }
+        public async Task<Stream> GetReportAndThesisDocuments(int userId, int docId, string uniqueName)
+        {
+            try
+            {
+                string supabaseUrl = GetSupabaseUrl();
+                string supabaseKey = GetSupabaseKey();
+                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
+                await supabaseClient.InitializeAsync();
+
+                var bucket = supabaseClient.Storage.From("StudentReport");
+                string documentName = GetDocumentName(docId);
+
+                string folderName = $"{userId}_{uniqueName}";
+                string filePath = $"{folderName}/{documentName}";
+
+                byte[] fileBytes = await bucket.Download(filePath, (sender, progress) => { });
+
+                if (fileBytes == null || fileBytes.Length == 0)
+                {
+                    var logs = _allServices.PrepareLog("DocumentService", "", "", "ไม่พบไฟล์ที่ path: " + filePath, NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
+                    _allServices.SysApilogs(logs);
+                    return Stream.Null;
+                }
+
+                var memoryStream = new MemoryStream(fileBytes)
+                {
+                    Position = 0
+                };
+
+                return memoryStream;
+            }
+            catch (Exception ex)
+            {
+                var logs = _allServices.PrepareLog("DocumentService", "", "", ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
+                _allServices.SysApilogs(logs);
+                return Stream.Null;
             }
         }
 
