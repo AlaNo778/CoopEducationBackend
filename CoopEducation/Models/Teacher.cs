@@ -19,6 +19,8 @@ public partial class Teacher
 
     public string? Phone { get; set; }
 
+    public int Major { get; set; }
+
     public virtual ICollection<Advisorship> Advisorships { get; set; } = new List<Advisorship>();
 
     public virtual User? User { get; set; }

@@ -183,6 +183,23 @@ namespace CoopEducation.Services
                                      }).FirstOrDefaultAsync();
             return studentInfo;
         }
+        public async Task<List<StudentListDTO>> GetListStudentPrepareAssignment(int userId)
+        {
+            int major = await (from m in _context.Teachers
+                               where m.UserId == userId
+                               select m.Major).FirstOrDefaultAsync();
+
+            var listData = await (from s  in _context.Students
+                                  where s.MajorId == major
+                                  select new StudentListDTO
+                                  {
+                                      StudentId = s.StudentId,
+                                      FirstName = s.FirstName,
+                                      LastName = s.LastName
+                                  }
+                                  ).ToListAsync();
+            return listData;
+        }
         public async Task<List<AdviseeStudentsDTO?>> GetAdviseeStudents(int userId)
         {
             var adviseeStudents = await (from t in _context.Teachers
