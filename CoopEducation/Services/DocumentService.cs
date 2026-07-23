@@ -3,7 +3,6 @@ using CoopEducation.Models;
 using CoopEducation.Models.DTO;
 using Microsoft.EntityFrameworkCore;
 using Supabase.Gotrue;
-using Supabase.Interfaces;
 using System.IO.Compression;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
@@ -13,10 +12,12 @@ namespace CoopEducation.Services
     {
         private readonly CoopEducationDbContext _context;
         private readonly AllServices _allServices;
-        public DocumentService(CoopEducationDbContext context, AllServices allServices)
+        private readonly Supabase.Client _supabaseClient;
+        public DocumentService(CoopEducationDbContext context, AllServices allServices,Supabase.Client supabaseClient)
         {
             _context = context;
             _allServices = allServices;
+            _supabaseClient = supabaseClient;
         }
         public async Task<Stream> GetDocuments(int docRequest, int userId)
         {
@@ -65,11 +66,7 @@ namespace CoopEducation.Services
                     return string.Empty;
                 }
 
-                string supabaseUrl = GetSupabaseUrl();
-                string supabaseKey = GetSupabaseKey();
-                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
-                await supabaseClient.InitializeAsync();
-                var bucket = supabaseClient.Storage.From(GetbucketName(roleName));
+                var bucket = _supabaseClient.Storage.From(GetbucketName(roleName));
                 string documentName = GetDocumentName(docId);
 
                 string folderName = $"{userId}_{uniqueName}";
@@ -82,7 +79,7 @@ namespace CoopEducation.Services
                 if (response != null)
                 {
                     SetLogDocDTO logDoc = _allServices.LogDoc(roleName,userId,docId,filePath);
-                    _allServices.SysDocLogs(logDoc);
+                    _allServices.SysDocLogs(logDoc,roleName);
                     return filePath;
                 }
                 else
@@ -116,11 +113,8 @@ namespace CoopEducation.Services
                 List<int> docIds = GetDocIdsByRole(roleName);
                 if (docIds == null || docIds.Count == 0)
                     return null!;
-                string supabaseUrl = GetSupabaseUrl();
-                string supabaseKey = GetSupabaseKey();
-                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
-                await supabaseClient.InitializeAsync();
-                var bucket = supabaseClient.Storage.From("TemplateDocument");
+                
+                var bucket = _supabaseClient.Storage.From("TemplateDocument");
 
                 var zipStream = new MemoryStream();
 
@@ -166,35 +160,58 @@ namespace CoopEducation.Services
             return roleName switch
             {
                 "student" => new List<int> { 1, 3, 4, 11, 12, 13, 14, 15, 31},
-                "teacher" => new List<int> { 6, 7, 8, 9, 10},
+                "teacher" => new List<int> { 6, 7, 8, 9, 10, 57, 58 },
                 "staff" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31},
-                "admin" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31 },
+                "admin" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31},
                 _ => new List<int>()
             };
         }
-        public async Task<List<int?>> GetexistDoc(int userId)
+        public async Task<List<int?>> GetExistDoc(int userId, string roleName)
+        {
+            if (roleName == "student")
+            {
+                int studentId = await GetStudentId(userId);
+
+                return await _context.StudentDocuments
+                    .Where(x => x.StudentId == studentId)
+                    .GroupBy(x => x.DocTypeId)
+                    .Select(g => g.OrderByDescending(x => x.UploadedAt).First().DocTypeId)
+                    .Select(x => (int?)x)
+                    .ToListAsync();
+            }
+
+            if (roleName == "teacher")
+            {
+                int teacherId = await GetteacherId(userId);
+
+                return await _context.TeacherDocuments
+                    .Where(x => x.TeacherId == teacherId)
+                    .GroupBy(x => x.DocTypeId)
+                    .Select(g => g.OrderByDescending(x => x.UploadedAt).First().DocTypeId)
+                    .Select(x => (int?)x)
+                    .ToListAsync();
+            }
+
+            return new List<int?>();
+        }
+
+        public async Task<int> GetStudentId(int userId)
         {
             int studentId = await _context.Students
                 .Where(x => x.UserId == userId)
                 .Select(x => x.StudentId)
                 .FirstOrDefaultAsync();
 
-            List<int?> exist = _context.StudentDocuments
-                .Where(x => x.StudentId == studentId)
-                .Select(x => new { x.DocTypeId, x.UploadedAt })
-                .AsEnumerable()
-                .GroupBy(x => x.DocTypeId)
-                .Select(g => g.OrderByDescending(x => x.UploadedAt).First())
-                .Select(x => (int?)x.DocTypeId)
-                .Cast<int?>()
-                .ToList();
+            return studentId;
+        }
+        public async Task<int> GetteacherId(int userId)
+        {
+            int teacherId = await _context.Teachers
+                .Where(x => x.UserId == userId)
+                .Select(x => x.TeacherId)
+                .FirstOrDefaultAsync();
 
-            if (exist.Count == 0)
-            {
-                return new List<int?>();
-            }
-
-            return exist;
+            return teacherId;
         }
         public async Task<string> UploadReport(IFormFile file, int docId, string roleName, int userId, string uniqueName)
         {
@@ -205,12 +222,7 @@ namespace CoopEducation.Services
                     return string.Empty;
                 }
 
-                string supabaseUrl = GetSupabaseUrl();
-                string supabaseKey = GetSupabaseKey();
-                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
-                await supabaseClient.InitializeAsync();
-
-                var bucket = supabaseClient.Storage.From("StudentReport");
+                var bucket = _supabaseClient.Storage.From("StudentReport");
                 string documentName = GetDocumentName(docId);
 
                 string folderName = $"{userId}_{uniqueName}";
@@ -223,7 +235,7 @@ namespace CoopEducation.Services
                 if (response != null)
                 {
                     SetLogDocDTO logDoc = _allServices.LogDoc(roleName, userId, docId, filePath);
-                    _allServices.SysDocLogs(logDoc);
+                    _allServices.SysDocLogs(logDoc,roleName);
                     return filePath;
                 }
                 else
@@ -238,44 +250,40 @@ namespace CoopEducation.Services
                 return string.Empty;
             }
         }
-        public async Task<Stream> GetReportAndThesisDocuments(int userId, int docId, string uniqueName)
+        public async Task<string?> GetSignedUrl(int userId, int docId, string uniqueName, CancellationToken ct = default)
         {
-            try
-            {
-                string supabaseUrl = GetSupabaseUrl();
-                string supabaseKey = GetSupabaseKey();
-                var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey);
-                await supabaseClient.InitializeAsync();
+            var bucket = _supabaseClient.Storage.From("StudentReport");
+            string filePath = $"{userId}_{uniqueName}/{GetDocumentName(docId)}";
+            var signedUrl = await bucket.CreateSignedUrl(filePath, 60);
+            //Console.WriteLine($"[{signedUrl}]");
+            //Console.WriteLine(signedUrl.Length);
+            //Console.WriteLine((int)signedUrl[^1]);
+            signedUrl = signedUrl.TrimEnd('?');
+            return signedUrl;
+        }
+        public async Task<List<DocumentExistDto>> GetexistDocId(int userId)
+        {
+            int studentId = await _context.Students
+                .Where(x => x.UserId == userId)
+                .Select(x => x.StudentId)
+                .FirstOrDefaultAsync();
 
-                var bucket = supabaseClient.Storage.From("StudentReport");
-                string documentName = GetDocumentName(docId);
-
-                string folderName = $"{userId}_{uniqueName}";
-                string filePath = $"{folderName}/{documentName}";
-
-                byte[] fileBytes = await bucket.Download(filePath, (sender, progress) => { });
-
-                if (fileBytes == null || fileBytes.Length == 0)
+            List<DocumentExistDto> exist = _context.StudentDocuments
+                .Where(x => x.StudentId == studentId)
+                .Select(x => new { x.DocTypeId, x.UploadedAt, x.Approved }) 
+                .AsEnumerable()
+                .GroupBy(x => x.DocTypeId)
+                .Select(g => g.OrderByDescending(x => x.UploadedAt).First())
+                .Select(x => new DocumentExistDto
                 {
-                    var logs = _allServices.PrepareLog("DocumentService", "", "", "ไม่พบไฟล์ที่ path: " + filePath, NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
-                    _allServices.SysApilogs(logs);
-                    return Stream.Null;
-                }
+                    DocTypeId = x.DocTypeId,
+                    Approved = x.Approved
+                })
+                .ToList();
 
-                var memoryStream = new MemoryStream(fileBytes)
-                {
-                    Position = 0
-                };
-
-                return memoryStream;
-            }
-            catch (Exception ex)
-            {
-                var logs = _allServices.PrepareLog("DocumentService", "", "", ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
-                _allServices.SysApilogs(logs);
-                return Stream.Null;
-            }
+            return exist;
         }
 
     }
+
 }

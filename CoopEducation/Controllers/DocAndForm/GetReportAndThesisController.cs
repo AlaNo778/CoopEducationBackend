@@ -25,19 +25,12 @@ namespace CoopEducation.Controllers.DocAndForm
             _docService = docService;
         }
         [HttpGet]
-        public async Task<IActionResult> GetReportAndThesis(int docId)
+        public async Task<string> GetReportAndThesis(int docId, CancellationToken ct)
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
-            string methodName = MethodOfLogSystem.GET.ToString();
-            string roleName = _userService.GetClaimValue(ClaimTypes.Role);
             string uniqueName = _userService.GetClaimValue("unique_name");
-            var steamFile = await _docService.GetReportAndThesisDocuments(userId, docId, uniqueName);
-            if (steamFile == null || steamFile == Stream.Null || steamFile.Length == 0)
-            {
-                return NotFound("ไม่พบไฟล์เอกสาร");
-            }
-            return File(steamFile, "application/pdf");
+            var filePath = await _docService.GetSignedUrl(userId, docId, uniqueName, ct);
+            return filePath;
         }
-
     }
 }

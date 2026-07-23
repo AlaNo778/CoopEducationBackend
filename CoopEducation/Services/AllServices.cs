@@ -50,7 +50,7 @@ namespace CoopEducation.Services
             {
                 SetLogDocDTO logDoc = new SetLogDocDTO
                 {
-                    StudentId = Convert.ToInt32(GetStudentId(userId)),
+                    Id = Convert.ToInt32(GetStudentId(userId)),
                     DocTypeId = docId,
                     FileName = fileName,
                     PlacementId = Convert.ToInt32(GetPlacementId(userId)),
@@ -58,21 +58,62 @@ namespace CoopEducation.Services
                 };
                 return logDoc;
             }
+            if (roleName == "teacher")
+            {
+                SetLogDocDTO logDoc = new SetLogDocDTO
+                {
+                    Id = Convert.ToInt32(GetTeacherId(userId)),
+                    DocTypeId = docId,
+                    FileName = fileName,
+                    PlacementId = Convert.ToInt32(GetPlacementId(userId)),
+                    UploadedAt = DateTime.Now,
+                };
+                return logDoc;
+            }
+
             return new SetLogDocDTO();
         }
-        public void SysDocLogs(SetLogDocDTO setLogDocDto)
+        public void SysDocLogs(SetLogDocDTO setLogDocDto,string roleName)
         {
-            StudentDocument docLog = new StudentDocument()
+            if (roleName == "student")
             {
-                StudentId = setLogDocDto.StudentId,
-                DocTypeId = setLogDocDto.DocTypeId,
-                FileName = setLogDocDto.FileName,
-                PlacementId = setLogDocDto.PlacementId,
-                UploadedAt = setLogDocDto.UploadedAt
+                StudentDocument docLog = new StudentDocument()
+                {
+                    StudentId = setLogDocDto.Id,
+                    DocTypeId = setLogDocDto.DocTypeId,
+                    FileName = setLogDocDto.FileName,
+                    PlacementId = setLogDocDto.PlacementId,
+                    UploadedAt = setLogDocDto.UploadedAt
+                };
+                _context.StudentDocuments.Add(docLog);
+                _context.SaveChanges();
+            }
+            else
+            {
+                TeacherDocument docLog = new TeacherDocument()
+                {
+                    TeacherId = setLogDocDto.Id ?? 0,
+                    DocTypeId = setLogDocDto.DocTypeId ?? 0,
+                    FileName = setLogDocDto.FileName ?? "",
+                    UploadedAt = setLogDocDto.UploadedAt ?? DateTime.Now
+                };
+                _context.TeacherDocuments.Add(docLog);
+                _context.SaveChanges();
+            }
+        }
+        public void AssignmentStudent(int teacherId,AdvisorshipDTO data)
+        {
+            Advisorship prepareData = new Advisorship()
+            {
+                StudentId = data.StudentId,
+                TeacherId = teacherId,
+                AcademicYear = data.AcademicYear,
+                AssignedAt = DateTime.Now,
             };
-            _context.StudentDocuments.Add(docLog);
+            _context.Advisorships.Add(prepareData);
             _context.SaveChanges();
         }
+
         private string GetPlacementId(int userId)
         {
             int studentId = GetStudentId(userId);
@@ -81,6 +122,10 @@ namespace CoopEducation.Services
         public int GetStudentId(int userId)
         {
             return _context.Students.Where(s => s.UserId == userId).Select(s => s.StudentId).FirstOrDefault();
+        }
+        public int GetTeacherId(int userId)
+        {
+            return _context.Teachers.Where(s => s.UserId == userId).Select(s => s.TeacherId).FirstOrDefault();
         }
         public ResponseMessage<T> WriteResponse<T>(T? data, string? messaage, string? code, bool isError)
         {
@@ -198,6 +243,7 @@ namespace CoopEducation.Services
 
             return adviseeStudents;
         }
+        
         public async Task<TeacherInfoDTO?> GetTeacherInfo(int userId)
         {
             var teacherInfo = await (from t in _context.Teachers

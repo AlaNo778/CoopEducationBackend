@@ -43,7 +43,11 @@ public partial class CoopEducationDbContext : DbContext
 
     public virtual DbSet<StudentDocument> StudentDocuments { get; set; }
 
+    public virtual DbSet<SupervisionAppointmentDate> SupervisionAppointmentDates { get; set; }
+
     public virtual DbSet<Teacher> Teachers { get; set; }
+
+    public virtual DbSet<TeacherDocument> TeacherDocuments { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 
@@ -450,20 +454,13 @@ public partial class CoopEducationDbContext : DbContext
             entity.ToTable("student_documents");
 
             entity.Property(e => e.DocId).HasColumnName("doc_id");
+            entity.Property(e => e.Approved).HasColumnName("approved");
             entity.Property(e => e.DocTypeId).HasColumnName("doc_type_id");
             entity.Property(e => e.FileName)
                 .HasMaxLength(100)
                 .IsUnicode(false)
                 .HasColumnName("file_name");
-            entity.Property(e => e.FileSize)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasColumnName("file_size");
             entity.Property(e => e.PlacementId).HasColumnName("placement_id");
-            entity.Property(e => e.RealFileName)
-                .HasMaxLength(100)
-                .IsUnicode(false)
-                .HasColumnName("real_file_name");
             entity.Property(e => e.StudentId).HasColumnName("student_id");
             entity.Property(e => e.UploadedAt)
                 .HasColumnType("datetime")
@@ -480,6 +477,26 @@ public partial class CoopEducationDbContext : DbContext
             entity.HasOne(d => d.Student).WithMany(p => p.StudentDocuments)
                 .HasForeignKey(d => d.StudentId)
                 .HasConstraintName("fk_student_document_students");
+        });
+
+        modelBuilder.Entity<SupervisionAppointmentDate>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("supervision_appointment_date");
+
+            entity.Property(e => e.AppointmentConfirmation).HasColumnName("appointment_confirmation");
+            entity.Property(e => e.AppointmentDate).HasColumnName("appointment_date");
+            entity.Property(e => e.AppointmentLocation)
+                .HasMaxLength(500)
+                .HasColumnName("appointment_location");
+            entity.Property(e => e.AppointmentTime).HasColumnName("appointment_time");
+            entity.Property(e => e.ScheduleId).HasColumnName("schedule_id");
+            entity.Property(e => e.StudentId).HasColumnName("student_id");
+            entity.Property(e => e.SupervisionModel)
+                .HasMaxLength(50)
+                .HasColumnName("supervision_model");
+            entity.Property(e => e.TeacherId).HasColumnName("teacher_id");
         });
 
         modelBuilder.Entity<Teacher>(entity =>
@@ -513,6 +530,24 @@ public partial class CoopEducationDbContext : DbContext
             entity.HasOne(d => d.User).WithOne(p => p.Teacher)
                 .HasForeignKey<Teacher>(d => d.UserId)
                 .HasConstraintName("fk_teachers_users");
+        });
+
+        modelBuilder.Entity<TeacherDocument>(entity =>
+        {
+            entity.HasKey(e => e.DocId).HasName("PK__teacher___8AD02924E91F2382");
+
+            entity.ToTable("teacher_documents");
+
+            entity.Property(e => e.DocId).HasColumnName("doc_id");
+            entity.Property(e => e.DocTypeId).HasColumnName("doc_type_id");
+            entity.Property(e => e.FileName)
+                .HasMaxLength(200)
+                .HasColumnName("file_name");
+            entity.Property(e => e.StudentId).HasColumnName("student_id");
+            entity.Property(e => e.TeacherId).HasColumnName("teacher_id");
+            entity.Property(e => e.UploadedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("uploaded_at");
         });
 
         modelBuilder.Entity<User>(entity =>

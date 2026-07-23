@@ -15,11 +15,9 @@ public partial class StudentDocument
 
     public string? FileName { get; set; }
 
-    public string? FileSize { get; set; }
-
     public DateTime? UploadedAt { get; set; }
 
-    public string? RealFileName { get; set; }
+    public bool? Approved { get; set; }
 
     public virtual DocumentType? DocType { get; set; }
 

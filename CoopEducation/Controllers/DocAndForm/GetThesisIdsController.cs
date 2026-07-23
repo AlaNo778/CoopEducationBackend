@@ -1,4 +1,5 @@
 ﻿using CoopEducation.Models;
+using CoopEducation.Models.DTO;
 using CoopEducation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,7 @@ namespace CoopEducation.Controllers.DocAndForm
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class DocumentInfoController : ControllerBase
+    public class GetThesisIdsController : ControllerBase
     {
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
@@ -17,21 +18,19 @@ namespace CoopEducation.Controllers.DocAndForm
         private readonly IUserService _userService;
         private readonly DocumentService _docService;
 
-        public DocumentInfoController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService, DocumentService docService)
+        public GetThesisIdsController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService, DocumentService docService)
         {
-                _tokenService = tokenService;
-                _context = context;
-                allServices = new(_context, _tokenService);
-                _userService = userService;
-                _docService = docService;
+            _tokenService = tokenService;
+            _context = context;
+            allServices = new(_context, _tokenService);
+            _userService = userService;
+            _docService = docService;
         }
         [HttpGet]
-        public async Task<List<int?>> GetDocumentinfo()
+        public async Task<List<DocumentExistDto>> getThesisId()
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
-            string methodName = MethodOfLogSystem.GET.ToString();
-            string roleName = _userService.GetClaimValue(ClaimTypes.Role);
-            List<int?> listDoc = await _docService.GetExistDoc(userId, roleName);
+            List<DocumentExistDto> listDoc = await _docService.GetexistDocId(userId);
             return listDoc;
         }
     }

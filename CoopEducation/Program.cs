@@ -96,17 +96,30 @@ builder.Services.AddRateLimiter(options =>
             "Too many login attempts. Please try again later.", cancellationToken);
     };
 });
-builder.Services.AddSwaggerGen(c =>
+//builder.Services.AddSwaggerGen(c =>
+//{
+//    c.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+//});
+builder.Services.AddSingleton(sp =>
 {
-    c.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+    var supabaseUrl = builder.Configuration["SUPABASE_URL"];
+    var supabaseKey = builder.Configuration["SUPABASE_KEY"];
+    var options = new Supabase.SupabaseOptions
+    {
+        AutoConnectRealtime = false
+    };
+    var client = new Supabase.Client(supabaseUrl, supabaseKey, options);
+    client.InitializeAsync().GetAwaiter().GetResult();
+    return client;
 });
+
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
