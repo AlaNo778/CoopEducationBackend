@@ -27,7 +27,7 @@ namespace CoopEducation.Controllers.DocAndForm
         [Authorize(Roles = "student,teacher")]
         [HttpPost]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadReport([FromForm] IFormFile file, [FromForm] int docId)
+        public async Task<IActionResult> UploadReport([FromForm] IFormFile file, [FromForm] int docId, [FromForm] string? studentCode)
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             string methodName = MethodOfLogSystem.POST.ToString();
@@ -38,7 +38,7 @@ namespace CoopEducation.Controllers.DocAndForm
             {
                 return BadRequest("Failed to upload Report");
             }
-            string fileName = await _docService.UploadReport(file, docId, roleName, userId, uniqueName);
+            string fileName = await _docService.UploadReport(file, docId, roleName, userId, uniqueName, studentCode);
             if (string.IsNullOrEmpty(fileName))
             {
                 var errorLog = allServices.PrepareLog(

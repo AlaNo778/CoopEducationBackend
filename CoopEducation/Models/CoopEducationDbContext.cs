@@ -43,9 +43,11 @@ public partial class CoopEducationDbContext : DbContext
 
     public virtual DbSet<StudentDocument> StudentDocuments { get; set; }
 
-    public virtual DbSet<SupervisionAppointmentDate> SupervisionAppointmentDates { get; set; }
+    public virtual DbSet<SupervisionAppointment> SupervisionAppointments { get; set; }
 
     public virtual DbSet<Teacher> Teachers { get; set; }
+
+    public virtual DbSet<TeacherAvailableSlot> TeacherAvailableSlots { get; set; }
 
     public virtual DbSet<TeacherDocument> TeacherDocuments { get; set; }
 
@@ -479,24 +481,42 @@ public partial class CoopEducationDbContext : DbContext
                 .HasConstraintName("fk_student_document_students");
         });
 
-        modelBuilder.Entity<SupervisionAppointmentDate>(entity =>
+        modelBuilder.Entity<SupervisionAppointment>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("supervision_appointment_date");
+            entity.HasKey(e => e.AppointmentId).HasName("PK__supervis__A50828FC4C7D501A");
 
-            entity.Property(e => e.AppointmentConfirmation).HasColumnName("appointment_confirmation");
-            entity.Property(e => e.AppointmentDate).HasColumnName("appointment_date");
-            entity.Property(e => e.AppointmentLocation)
-                .HasMaxLength(500)
-                .HasColumnName("appointment_location");
-            entity.Property(e => e.AppointmentTime).HasColumnName("appointment_time");
-            entity.Property(e => e.ScheduleId).HasColumnName("schedule_id");
+            entity.ToTable("supervision_appointment");
+
+            entity.Property(e => e.AppointmentId).HasColumnName("appointment_id");
+            entity.Property(e => e.AppointmentStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Pending")
+                .HasColumnName("appointment_status");
+            entity.Property(e => e.BookedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("booked_at");
+            entity.Property(e => e.CancelledAt)
+                .HasColumnType("datetime")
+                .HasColumnName("cancelled_at");
+            entity.Property(e => e.ConfirmedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("confirmed_at");
+            entity.Property(e => e.SlotId).HasColumnName("slot_id");
             entity.Property(e => e.StudentId).HasColumnName("student_id");
-            entity.Property(e => e.SupervisionModel)
-                .HasMaxLength(50)
-                .HasColumnName("supervision_model");
+            entity.Property(e => e.StudentNote)
+                .HasMaxLength(500)
+                .HasColumnName("student_note");
             entity.Property(e => e.TeacherId).HasColumnName("teacher_id");
+            entity.Property(e => e.TeacherNote)
+                .HasMaxLength(500)
+                .HasColumnName("teacher_note");
+
+            entity.HasOne(d => d.Slot).WithMany(p => p.SupervisionAppointments)
+                .HasForeignKey(d => d.SlotId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Appointment_Slot");
         });
 
         modelBuilder.Entity<Teacher>(entity =>
@@ -531,6 +551,48 @@ public partial class CoopEducationDbContext : DbContext
             entity.HasOne(d => d.User).WithOne(p => p.Teacher)
                 .HasForeignKey<Teacher>(d => d.UserId)
                 .HasConstraintName("fk_teachers_users");
+        });
+
+        modelBuilder.Entity<TeacherAvailableSlot>(entity =>
+        {
+            entity.HasKey(e => e.SlotId).HasName("PK__teacher___971A01BBB5169135");
+
+            entity.ToTable("teacher_available_slot");
+
+            entity.Property(e => e.SlotId).HasColumnName("slot_id");
+            entity.Property(e => e.AvailableDate).HasColumnName("available_date");
+            entity.Property(e => e.BookedStudents)
+                .HasDefaultValue(0)
+                .HasColumnName("booked_students");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.EndTime).HasColumnName("end_time");
+            entity.Property(e => e.Location)
+                .HasMaxLength(255)
+                .HasColumnName("location");
+            entity.Property(e => e.MaxStudents)
+                .HasDefaultValue(1)
+                .HasColumnName("max_students");
+            entity.Property(e => e.Remark)
+                .HasMaxLength(500)
+                .HasColumnName("remark");
+            entity.Property(e => e.SlotStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Available")
+                .HasColumnName("slot_status");
+            entity.Property(e => e.StartTime).HasColumnName("start_time");
+            entity.Property(e => e.SupervisionModel)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasColumnName("supervision_model");
+            entity.Property(e => e.TeacherId).HasColumnName("teacher_id");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<TeacherDocument>(entity =>

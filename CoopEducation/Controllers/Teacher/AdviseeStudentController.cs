@@ -32,7 +32,7 @@ namespace CoopEducation.Controllers.Teacher
             string userRole = _userService.GetClaimValue(ClaimTypes.Role);
             if (userRole == "teacher" && userId > 0)
             {
-                List<AdviseeStudentsDTO?> adviseeStudents = await allServices.GetAdviseeStudents(userId);
+                List<AdviseeStudentsDTO?> adviseeStudents = await allServices.GetAdviseeStudents(userId,null);
                 if (adviseeStudents == null || adviseeStudents.Count == 0)
                 {
                     return allServices.WriteResponse<List<AdviseeStudentsDTO>>(null, "No advisee students found.", (NSTools.GetEnumDescription(ResponseCode.NotFound)!).ToString(), true);

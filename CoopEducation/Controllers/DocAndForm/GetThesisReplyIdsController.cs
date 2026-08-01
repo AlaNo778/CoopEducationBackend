@@ -1,4 +1,5 @@
 ﻿using CoopEducation.Models;
+using CoopEducation.Models.DTO;
 using CoopEducation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,14 +10,15 @@ namespace CoopEducation.Controllers.DocAndForm
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class GetReportAndThesisController : ControllerBase
+    public class GetThesisReplyIdsController : ControllerBase
     {
         private readonly CoopEducationDbContext _context;
         private readonly ITokenService _tokenService;
         private readonly AllServices allServices;
-        private readonly DocumentService _docService;
         private readonly IUserService _userService;
-        public GetReportAndThesisController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService, DocumentService docService)
+        private readonly DocumentService _docService;
+
+        public GetThesisReplyIdsController(ITokenService tokenService, CoopEducationDbContext context, IUserService userService, DocumentService docService)
         {
             _tokenService = tokenService;
             _context = context;
@@ -25,12 +27,11 @@ namespace CoopEducation.Controllers.DocAndForm
             _docService = docService;
         }
         [HttpGet]
-        public async Task<string> GetReportAndThesis(int docId,string? studentCode)
+        public async Task<List<int>> getThesisId()
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
-            string uniqueName = _userService.GetClaimValue("unique_name");
-            var filePath = await _docService.GetSignedUrl(userId, docId, uniqueName,studentCode);
-            return filePath;
+            List<int> listDoc = await _docService.GetexistReplyDocId(userId);
+            return listDoc;
         }
     }
 }

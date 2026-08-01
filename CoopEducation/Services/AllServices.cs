@@ -44,7 +44,7 @@ namespace CoopEducation.Services
             _context.ApiLogs.Add(apiLog);
             _context.SaveChanges();
         }
-        public SetLogDocDTO LogDoc(string roleName, int userId, int docId, string fileName)
+        public SetLogDocDTO LogDoc(string roleName, int userId, int docId, string fileName, int? studentId)
         {
             if (roleName == "student")
             {
@@ -64,6 +64,7 @@ namespace CoopEducation.Services
                 {
                     Id = Convert.ToInt32(GetTeacherId(userId)),
                     DocTypeId = docId,
+                    StudentId = studentId,
                     FileName = fileName,
                     PlacementId = Convert.ToInt32(GetPlacementId(userId)),
                     UploadedAt = DateTime.Now,
@@ -73,7 +74,7 @@ namespace CoopEducation.Services
 
             return new SetLogDocDTO();
         }
-        public void SysDocLogs(SetLogDocDTO setLogDocDto,string roleName)
+        public void SysDocLogs(SetLogDocDTO setLogDocDto, string roleName)
         {
             if (roleName == "student")
             {
@@ -94,6 +95,7 @@ namespace CoopEducation.Services
                 {
                     TeacherId = setLogDocDto.Id ?? 0,
                     DocTypeId = setLogDocDto.DocTypeId ?? 0,
+                    StudentId = setLogDocDto.StudentId,
                     FileName = setLogDocDto.FileName ?? "",
                     UploadedAt = setLogDocDto.UploadedAt ?? DateTime.Now
                 };
@@ -101,8 +103,9 @@ namespace CoopEducation.Services
                 _context.SaveChanges();
             }
         }
-        public void AssignmentStudent(int teacherId,AdvisorshipDTO data)
+        public void AssignmentStudent(int userId, AdvisorshipDTO data)
         {
+            int teacherId = GetTeacherId(userId);
             Advisorship prepareData = new Advisorship()
             {
                 StudentId = data.StudentId,
@@ -185,82 +188,103 @@ namespace CoopEducation.Services
         }
         public async Task<List<StudentListDTO>> GetListStudentPrepareAssignment(int userId)
         {
-            int major = await (from m in _context.Teachers
-                               where m.UserId == userId
-                               select m.Major).FirstOrDefaultAsync();
+            int major = await (from t in _context.Teachers
+                               where t.UserId == userId
+                               select t.Major)
+                               .FirstOrDefaultAsync();
 
-            var listData = await (from s  in _context.Students
+            var listData = await (from s in _context.Students
                                   where s.MajorId == major
+                                        && !_context.Advisorships.Any(a => a.StudentId == s.StudentId)
                                   select new StudentListDTO
                                   {
                                       StudentId = s.StudentId,
                                       FirstName = s.FirstName,
                                       LastName = s.LastName
-                                  }
-                                  ).ToListAsync();
+                                  })
+                                  .ToListAsync();
+
             return listData;
         }
-        public async Task<List<AdviseeStudentsDTO?>> GetAdviseeStudents(int userId)
+        public async Task<List<AdviseeStudentsDTO?>> GetAdviseeStudents(int userId, string? StudentCode)
         {
-            var adviseeStudents = await (from t in _context.Teachers
-                                         join a in _context.Advisorships on t.TeacherId equals a.TeacherId into ta
-                                         from adviseStudent in ta.DefaultIfEmpty()
+            try
+            {
+                var adviseeStudents = await (from t in _context.Teachers
+                                             join a in _context.Advisorships on t.TeacherId equals a.TeacherId into ta
+                                             from adviseStudent in ta.DefaultIfEmpty()
 
-                                         join s in _context.Students on adviseStudent.StudentId equals s.StudentId into ads
-                                         from student in ads.DefaultIfEmpty()
+                                             join s in _context.Students on adviseStudent.StudentId equals s.StudentId into ads
+                                             from student in ads.DefaultIfEmpty()
 
-                                         join m in _context.Majors on student.MajorId equals m.MajorId into am
-                                         from major in am.DefaultIfEmpty()
+                                             join m in _context.Majors on student.MajorId equals m.MajorId into am
+                                             from major in am.DefaultIfEmpty()
 
-                                         join c in _context.StudentContacts on student.StudentId equals c.StudentId into sc
-                                         from StudentContact in sc.DefaultIfEmpty()
+                                             join c in _context.StudentContacts on student.StudentId equals c.StudentId into sc
+                                             from StudentContact in sc.DefaultIfEmpty()
 
-                                         join ad in _context.StudentAddresses on student.StudentId equals ad.StudentId into sa
-                                         from StudentAddress in sa.DefaultIfEmpty()
+                                             join ad in _context.StudentAddresses on student.StudentId equals ad.StudentId into sa
+                                             from StudentAddress in sa.DefaultIfEmpty()
 
-                                         join cp in _context.CoopPlacements on student.StudentId equals cp.StudentId into scp
-                                         from CoopPlacement in scp.DefaultIfEmpty()
+                                             join cp in _context.CoopPlacements on student.StudentId equals cp.StudentId into scp
+                                             from CoopPlacement in scp.DefaultIfEmpty()
 
-                                         join mtr in _context.Mentors on CoopPlacement.MentorId equals mtr.MentorId into cm
-                                         from Mentor in cm.DefaultIfEmpty()
+                                             join mtr in _context.Mentors on CoopPlacement.MentorId equals mtr.MentorId into cm
+                                             from Mentor in cm.DefaultIfEmpty()
 
-                                         join cn in _context.Companies on CoopPlacement.CompanyId equals cn.CompanyId into ccn
-                                         from Company in ccn.DefaultIfEmpty()
+                                             join cn in _context.Companies on CoopPlacement.CompanyId equals cn.CompanyId into ccn
+                                             from Company in ccn.DefaultIfEmpty()
 
-                                         where t.UserId == userId
+                                             where t.UserId == userId
 
-                                         select new AdviseeStudentsDTO
-                                         {
-                                             FirstName = student.FirstName,
-                                             LastName = student.LastName,
-                                             StudentCode = student.StudentCode,
-                                             Email = student.Email,
-                                             Faculty = student.Faculty,
-                                             Gpax = student.Gpax,
-                                             TotalCredits = student.TotalCredits,
-                                             MajorName = major != null ? major.MajorName : null,
-                                             PhoneHome = StudentContact != null ? StudentContact.PhoneHome : null,
-                                             PhoneMobile = StudentContact != null ? StudentContact.PhoneMobile : null,
-                                             Facebook = StudentContact != null ? StudentContact.Facebook : null,
-                                             LineId = StudentContact != null ? StudentContact.LineId : null,
-                                             MentorFirstName = Mentor.FirstName,
-                                             MentorLastName = Mentor.LastName,
-                                             Position = Mentor.Position,
-                                             Department = Mentor.Department,
-                                             Phone = Mentor.Phone,
-                                             MentorEmail = Mentor.Email,
-                                             CompanyName = Company.CompanyName,
-                                             JobTitle = CoopPlacement.JobTitle,
-                                             JobDescription = CoopPlacement.JobDescription,
-                                             StartDate = CoopPlacement.StartDate,
-                                             EndDate = CoopPlacement.EndDate,
-                                             AcademicYear = CoopPlacement.AcademicYear,
-                                         }).ToListAsync();
+                                             select new AdviseeStudentsDTO
+                                             {
+                                                 FirstName = student.FirstName,
+                                                 LastName = student.LastName,
+                                                 StudentCode = student.StudentCode,
+                                                 Email = student.Email,
+                                                 Faculty = student.Faculty,
+                                                 Gpax = student.Gpax,
+                                                 TotalCredits = student.TotalCredits,
+                                                 MajorName = major != null ? major.MajorName : null,
+                                                 PhoneHome = StudentContact != null ? StudentContact.PhoneHome : null,
+                                                 PhoneMobile = StudentContact != null ? StudentContact.PhoneMobile : null,
+                                                 Facebook = StudentContact != null ? StudentContact.Facebook : null,
+                                                 LineId = StudentContact != null ? StudentContact.LineId : null,
+                                                 MentorFirstName = Mentor.FirstName,
+                                                 MentorLastName = Mentor.LastName,
+                                                 Position = Mentor.Position,
+                                                 Department = Mentor.Department,
+                                                 Phone = Mentor.Phone,
+                                                 MentorEmail = Mentor.Email,
+                                                 CompanyName = Company.CompanyName,
+                                                 JobTitle = CoopPlacement.JobTitle,
+                                                 JobDescription = CoopPlacement.JobDescription,
+                                                 StartDate = CoopPlacement.StartDate,
+                                                 EndDate = CoopPlacement.EndDate,
+                                                 AcademicYear = CoopPlacement.AcademicYear,
+                                             }).ToListAsync();
 
 
-            return adviseeStudents;
+                if (!string.IsNullOrEmpty(StudentCode))
+                {
+                    return adviseeStudents
+                        .Where(x => x.StudentCode == StudentCode)
+                        .ToList();
+                }
+                return adviseeStudents;
+            }
+            catch
+            {
+                return [];
+            }
         }
-        
+        public async Task<T?> ConvertListToSingle<T>(List<T> data)
+        {
+
+            return data.FirstOrDefault();
+        }
+
         public async Task<TeacherInfoDTO?> GetTeacherInfo(int userId)
         {
             var teacherInfo = await (from t in _context.Teachers
@@ -303,7 +327,7 @@ namespace CoopEducation.Services
             }
             else if (roleName == "staff")
             {
-                var userInfo = await (from a in _context.Staffs 
+                var userInfo = await (from a in _context.Staffs
                                       where a.UserId == userId
                                       select new UserInfoDTO
                                       {
@@ -374,7 +398,7 @@ namespace CoopEducation.Services
                     })
                     .FirstOrDefaultAsync(); // null ถ้าไม่เจอ student
 
-                        return studentCoopInfo;
+            return studentCoopInfo;
         }
         public async Task<List<CompanyInfoDTO>> GetCompanyInfo()
         {
@@ -428,7 +452,7 @@ namespace CoopEducation.Services
                 return (false, $"An error occurred while updating the mentor: {ex.Message}");
             }
         }
-        public async Task<(bool success, string message, int? mentorId)> AssignMentor(int userId , UpdateAndAssignMentorDTO mentorDto)
+        public async Task<(bool success, string message, int? mentorId)> AssignMentor(int userId, UpdateAndAssignMentorDTO mentorDto)
         {
             Mentor mentor = new Mentor
             {
@@ -444,12 +468,12 @@ namespace CoopEducation.Services
             var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
             if (student == null)
             {
-                return (false, "Student not found.",null);
+                return (false, "Student not found.", null);
             }
             var coopPlacement = await _context.CoopPlacements.FirstOrDefaultAsync(cp => cp.StudentId == student.StudentId);
             if (coopPlacement == null)
             {
-                return (false, "Coop placement not found for the student.",null);
+                return (false, "Coop placement not found for the student.", null);
             }
             var existingMentor = await _context.Mentors.FirstOrDefaultAsync(m => m.MentorId == coopPlacement.MentorId);
             if (existingMentor == null)
@@ -469,9 +493,9 @@ namespace CoopEducation.Services
                 coopPlacement.MentorId = newMentor.MentorId;
                 await _context.SaveChangesAsync();
                 int? id = await GetMentorIdAAafterInsert(mentorDto);
-                return (true, "Assign mentor successfully",id);
+                return (true, "Assign mentor successfully", id);
             }
-            return (false, "Mentor already assigned.",null);
+            return (false, "Mentor already assigned.", null);
 
         }
         public async Task<List<MentorDTO>> GetMentorsByCompanyId(int companyId)
@@ -514,11 +538,11 @@ namespace CoopEducation.Services
                 _context.Companies.Add(newCompany);
                 await _context.SaveChangesAsync();
                 int? id = await GetCompanyIdAfterInsert(companyDto);
-                return (true, "Company added successfully.",id);
+                return (true, "Company added successfully.", id);
             }
             catch (Exception ex)
             {
-                return (false, $"An error occurred while adding the company: {ex.Message}",null);
+                return (false, $"An error occurred while adding the company: {ex.Message}", null);
             }
         }
         public async Task<(bool success, string message)> UpdateCompanyAsync(int userId, CompanyDTO companyDto)
@@ -611,7 +635,7 @@ namespace CoopEducation.Services
             {
                 return (false, $"An error occurred while updating the student's coop placement: {ex.Message}");
             }
-           
+
         }
         public async Task<int?> GetMentorIdAAafterInsert(UpdateAndAssignMentorDTO mentor)
         {
@@ -633,6 +657,92 @@ namespace CoopEducation.Services
             );
             int? id = companyEntity?.CompanyId;
             return id;
+        }
+        public async Task<bool> CreateAppointmentSlotAsync(int teacherId, AppointmentSlotDTO appointmentDto)
+        {
+            try
+            {
+                var appointmentSlot = new TeacherAvailableSlot
+                {
+                    TeacherId = teacherId,
+                    AvailableDate = appointmentDto.AvailableDate,
+                    StartTime = appointmentDto.StartTime,
+                    EndTime = appointmentDto.EndTime,
+                    SupervisionModel = appointmentDto.SupervisionModel,
+                    Location = appointmentDto.Location,
+                    Remark = appointmentDto.Remark,
+                    CreatedAt = DateTime.Now,
+                    MaxStudents = appointmentDto.MaxStudent,
+                };
+                _context.TeacherAvailableSlots.Add(appointmentSlot);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<List<GetAppointmentSlotDTO>> GetTeacherAvailableSlotsAsync(int teacherId)
+        {
+            var slots = await _context.TeacherAvailableSlots
+                .Where(slot => slot.TeacherId == teacherId)
+                .Select(slot => new GetAppointmentSlotDTO
+                {
+                    SlotId = slot.SlotId,
+                    AvailableDate = slot.AvailableDate,
+                    StartTime = slot.StartTime,
+                    EndTime = slot.EndTime,
+                    SupervisionModel = slot.SupervisionModel,
+                    Location = slot.Location,
+                    Remark = slot.Remark,
+                    MaxStudents = slot.MaxStudents,
+                    BookedStudents = slot.BookedStudents,
+                    SlotStatus = slot.SlotStatus,
+                })
+                .ToListAsync();
+            return slots;
+        }
+        public async Task<bool> BookAppointmentSlotAsync(int studentId, StudentBookAppointmentDTO dto)
+        {
+            var slot = await _context.TeacherAvailableSlots
+                .FirstOrDefaultAsync(s => s.SlotId == dto.SlotId && s.TeacherId == dto.TeacherId);
+
+            if (slot == null || slot.SlotStatus != "available" || (slot.MaxStudents.HasValue && slot.BookedStudents >= slot.MaxStudents.Value))
+            {
+                return false;
+            }
+            var appointment = new SupervisionAppointment
+            {
+                StudentId = studentId,
+                SlotId = dto.SlotId,
+                TeacherId = dto.TeacherId,
+                StudentNote = dto.StudentNote,
+                TeacherNote = dto.TeacherNote,
+                BookedAt = dto.BookedAt,
+            };
+            _context.SupervisionAppointments.Add(appointment);
+            slot.BookedStudents += 1;
+            if (slot.MaxStudents.HasValue && slot.BookedStudents >= slot.MaxStudents.Value)
+            {
+                slot.SlotStatus = "fully_booked";
+            }
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        public async Task<bool> ConfirmBookingAsync(int slotId)
+        {
+            var slot = await _context.TeacherAvailableSlots
+                .FirstOrDefaultAsync(s => s.SlotId == slotId);
+
+            if (slot == null || slot.SlotStatus != "fully_booked")
+            {
+                return false;
+            }
+            slot.SlotStatus = "confirmed";
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

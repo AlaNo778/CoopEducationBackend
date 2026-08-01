@@ -33,5 +33,19 @@ namespace CoopEducation.Controllers.DocAndForm
             List<DocumentExistDto> listDoc = await _docService.GetexistDocId(userId);
             return listDoc;
         }
+        [HttpPost("update_approve")]
+        public async Task<IActionResult> updateFinalStatus([FromQuery] int docId, [FromQuery] string studentCode)
+        {
+            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
+            bool result = await _docService.UpdateFinalStatus(docId, studentCode, userId);
+            if (result)
+            {
+                return Ok(new { message = "Status updated successfully" });
+            }
+            else
+            {
+                return BadRequest(new { message = "Failed to update status" });
+            }
+        }
     }
 }

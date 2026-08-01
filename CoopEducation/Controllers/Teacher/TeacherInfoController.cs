@@ -28,7 +28,7 @@ namespace CoopEducation.Controllers.Teacher
         [HttpGet]
         public async Task<ResponseMessage<TeacherInfoDTO>> GetTeacherInfo()
         {
-            int userId = Convert.ToInt32(_userService.GetClaimValue("Sub"));
+            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             string userRole = _userService.GetClaimValue(ClaimTypes.Role);
             if (userRole == "teacher" && userId > 0)
             {
