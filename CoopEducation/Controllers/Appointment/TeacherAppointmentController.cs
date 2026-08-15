@@ -3,6 +3,7 @@ using CoopEducation.Models.DTO;
 using CoopEducation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 
@@ -49,7 +50,7 @@ namespace CoopEducation.Controllers.Appointment
             return Ok(appointmentSlots);
         }
         [HttpPatch("confirm_booking")]
-        public async Task<IActionResult> ConfirmBooking(int slotId)
+        public async Task<IActionResult> ConfirmBooking(int appointmentId)
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             string userRole = _userService.GetClaimValue(ClaimTypes.Role);
@@ -59,12 +60,46 @@ namespace CoopEducation.Controllers.Appointment
                 return Unauthorized("Only teachers can confirm bookings.");
             }
 
-            bool success = await _allServices.ConfirmBookingAsync(slotId);
+            bool success = await _allServices.ConfirmBookingAsync(appointmentId);
             if (!success)
             {
                 return BadRequest("Failed to confirm booking.");
             }
             return Ok();
+        }
+        [HttpGet("get_appointment_detail")]
+        public async Task<IActionResult> GetAppointmentDetail()
+        {
+            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
+            string userRole = _userService.GetClaimValue(ClaimTypes.Role);
+
+            if (userRole != "teacher")
+                return Unauthorized("Only teachers can get bookings.");
+
+            int teacherId = _allServices.GetTeacherId(userId);
+
+            var data = await (
+                from appointment in _context.SupervisionAppointments
+                join student in _context.Students
+                    on appointment.StudentId equals student.StudentId
+                join slot in _context.TeacherAvailableSlots
+                    on appointment.SlotId equals slot.SlotId
+                where appointment.TeacherId == teacherId
+                select new TeacherAppointmentDetailDTO
+                {
+                    AppointmentId = appointment.AppointmentId,
+                    StudentId = appointment.StudentId,
+                    StudentName = student.FirstName + " " + student.LastName,
+                    StudentNote = appointment.StudentNote,
+                    TeacherNote = appointment.TeacherNote,
+                    AppointmentStatus = appointment.AppointmentStatus,
+                    BookedAt = appointment.BookedAt,
+                    SlotId = appointment.SlotId,
+                    Slot = slot
+                }
+            ).ToListAsync();
+
+            return Ok(data);
         }
 
     }

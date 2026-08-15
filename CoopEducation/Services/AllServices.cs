@@ -658,8 +658,9 @@ namespace CoopEducation.Services
             int? id = companyEntity?.CompanyId;
             return id;
         }
-        public async Task<bool> CreateAppointmentSlotAsync(int teacherId, AppointmentSlotDTO appointmentDto)
+        public async Task<bool> CreateAppointmentSlotAsync(int userId, AppointmentSlotDTO appointmentDto)
         {
+            int teacherId = GetTeacherId(userId);
             try
             {
                 var appointmentSlot = new TeacherAvailableSlot
@@ -687,7 +688,7 @@ namespace CoopEducation.Services
         public async Task<List<GetAppointmentSlotDTO>> GetTeacherAvailableSlotsAsync(int teacherId)
         {
             var slots = await _context.TeacherAvailableSlots
-                .Where(slot => slot.TeacherId == teacherId)
+                .Where(slot => slot.TeacherId == teacherId && slot.SlotStatus != "Closed")
                 .Select(slot => new GetAppointmentSlotDTO
                 {
                     SlotId = slot.SlotId,
@@ -704,15 +705,16 @@ namespace CoopEducation.Services
                 .ToListAsync();
             return slots;
         }
-        public async Task<bool> BookAppointmentSlotAsync(int studentId, StudentBookAppointmentDTO dto)
+        public async Task<bool> BookAppointmentSlotAsync(int userId, StudentBookAppointmentDTO dto)
         {
             var slot = await _context.TeacherAvailableSlots
                 .FirstOrDefaultAsync(s => s.SlotId == dto.SlotId && s.TeacherId == dto.TeacherId);
 
-            if (slot == null || slot.SlotStatus != "available" || (slot.MaxStudents.HasValue && slot.BookedStudents >= slot.MaxStudents.Value))
+            if (slot == null || (slot.MaxStudents.HasValue && slot.BookedStudents >= slot.MaxStudents.Value))
             {
                 return false;
             }
+            int studentId = GetStudentId(userId);
             var appointment = new SupervisionAppointment
             {
                 StudentId = studentId,
@@ -720,7 +722,7 @@ namespace CoopEducation.Services
                 TeacherId = dto.TeacherId,
                 StudentNote = dto.StudentNote,
                 TeacherNote = dto.TeacherNote,
-                BookedAt = dto.BookedAt,
+                BookedAt = DateTime.Now,
             };
             _context.SupervisionAppointments.Add(appointment);
             slot.BookedStudents += 1;
@@ -731,16 +733,16 @@ namespace CoopEducation.Services
             await _context.SaveChangesAsync();
             return true;
         }
-        public async Task<bool> ConfirmBookingAsync(int slotId)
+        public async Task<bool> ConfirmBookingAsync(int appointmentId)
         {
-            var slot = await _context.TeacherAvailableSlots
-                .FirstOrDefaultAsync(s => s.SlotId == slotId);
-
-            if (slot == null || slot.SlotStatus != "fully_booked")
+            var appointment = await _context.SupervisionAppointments
+                .FirstOrDefaultAsync(s => s.AppointmentId == appointmentId);
+            if (appointment == null)
             {
                 return false;
             }
-            slot.SlotStatus = "confirmed";
+            appointment.AppointmentStatus = "Confirmed";
+            appointment.ConfirmedAt = DateTime.Now;
             await _context.SaveChangesAsync();
             return true;
         }

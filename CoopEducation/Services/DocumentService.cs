@@ -3,6 +3,7 @@ using CoopEducation.Models;
 using CoopEducation.Models.DTO;
 using Microsoft.EntityFrameworkCore;
 using Supabase.Gotrue;
+using Supabase.Storage;
 using System.IO.Compression;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
@@ -13,7 +14,7 @@ namespace CoopEducation.Services
         private readonly CoopEducationDbContext _context;
         private readonly AllServices _allServices;
         private readonly Supabase.Client _supabaseClient;
-        public DocumentService(CoopEducationDbContext context, AllServices allServices,Supabase.Client supabaseClient)
+        public DocumentService(CoopEducationDbContext context, AllServices allServices, Supabase.Client supabaseClient)
         {
             _context = context;
             _allServices = allServices;
@@ -57,7 +58,7 @@ namespace CoopEducation.Services
         {
             return _context.DocumentTypes.Where(d => d.DocTypeId == docId).Select(d => d.DocName).FirstOrDefault() ?? "Sc01.pdf";
         }
-        public async Task<string> UploadDoc(IFormFile file, int docId, string roleName,int userId,string uniqueName)
+        public async Task<string> UploadDoc(IFormFile file, int docId, string roleName, int userId, string uniqueName)
         {
             try
             {
@@ -78,8 +79,8 @@ namespace CoopEducation.Services
                 var response = await bucket.Upload(fileBytes, filePath, new Supabase.Storage.FileOptions { Upsert = true });
                 if (response != null)
                 {
-                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName,userId,docId,filePath,null);
-                    _allServices.SysDocLogs(logDoc,roleName);
+                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName, userId, docId, filePath, null);
+                    _allServices.SysDocLogs(logDoc, roleName);
                     return filePath;
                 }
                 else
@@ -113,7 +114,7 @@ namespace CoopEducation.Services
                 List<int> docIds = GetDocIdsByRole(roleName);
                 if (docIds == null || docIds.Count == 0)
                     return null!;
-                
+
                 var bucket = _supabaseClient.Storage.From("TemplateDocument");
 
                 var zipStream = new MemoryStream();
@@ -147,7 +148,7 @@ namespace CoopEducation.Services
                 zipStream.Position = 0;
                 return zipStream;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine($"[ERROR] GetDocumentsByRole failed: {ex.Message}");
                 var logs = _allServices.PrepareLog("DocumentService", "", roleName.ToString(), ex.ToString(), NSTools.GetEnumDescription(ResponseCode.Error) ?? "", userId);
@@ -159,35 +160,77 @@ namespace CoopEducation.Services
         {
             return roleName switch
             {
-                "student" => new List<int> { 1, 3, 4, 11, 12, 13, 14, 15, 31},
+                "student" => new List<int> { 1, 3, 4, 11, 12, 13, 14, 15, 31 },
                 "teacher" => new List<int> { 6, 7, 8, 9, 10, 57, 58 },
-                "staff" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31},
-                "admin" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31},
+                "staff" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31 },
+                "admin" => new List<int> { 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31 },
                 _ => new List<int>()
             };
         }
-        public async Task<List<int?>> GetExistDoc(int userId, string roleName)
+        public async Task<List<int?>> GetExistDoc(int? userId, string? roleName, int? tUserId, string? tRoleName)
         {
-            if (roleName == "student")
+            string? role;
+            int? id;
+            bool isDirectId = false;
+            if (userId > 0)
             {
-                int studentId = await GetStudentId(userId);
+                role = roleName;
+                id = userId;
+            }
+            else if (tUserId > 0)
+            {
+                role = tRoleName;
+                id = tUserId;
+                isDirectId = true;
+            }
+            else
+            {
+                return new List<int?>();
+            }
+            if (role == "student")
+            {
+                int studentId;
+
+                if (isDirectId)
+                {
+                    studentId = id.Value;
+                }
+                else
+                {
+                    studentId = await GetStudentId(id.Value);
+                }
 
                 return await _context.StudentDocuments
                     .Where(x => x.StudentId == studentId)
                     .GroupBy(x => x.DocTypeId)
-                    .Select(g => g.OrderByDescending(x => x.UploadedAt).First().DocTypeId)
+                    .Select(g => g
+                        .OrderByDescending(x => x.UploadedAt)
+                        .First()
+                        .DocTypeId)
                     .Select(x => (int?)x)
                     .ToListAsync();
             }
 
-            if (roleName == "teacher")
+            if (role == "teacher")
             {
-                int teacherId = await GetteacherId(userId);
+                int teacherId;
+
+                if (isDirectId)
+                {
+                    teacherId = id.Value;
+                }
+                else
+                {
+                    teacherId = await GetteacherId(id.Value);
+                }
 
                 return await _context.TeacherDocuments
                     .Where(x => x.TeacherId == teacherId)
                     .GroupBy(x => x.DocTypeId)
-                    .Select(g => g.OrderByDescending(x => x.UploadedAt).First().DocTypeId)
+                    .Select(g => g
+                        .OrderByDescending(x => x.UploadedAt)
+                        .First()
+                        .DocTypeId)
                     .Select(x => (int?)x)
                     .ToListAsync();
             }
@@ -226,7 +269,7 @@ namespace CoopEducation.Services
 
             return teacherId;
         }
-        public async Task<string> UploadReport(IFormFile file, int docId, string roleName, int userId, string uniqueName,string? studentCode)
+        public async Task<string> UploadReport(IFormFile file, int docId, string roleName, int userId, string uniqueName, string? studentCode)
         {
             try
             {
@@ -244,18 +287,18 @@ namespace CoopEducation.Services
 
                 if (studentCode == null)
                 {
-                     folderName = $"{userId}_{uniqueName}";
-                     filePath = $"{folderName}/{documentName}";
+                    folderName = $"{userId}_{uniqueName}";
+                    filePath = $"{folderName}/{documentName}";
                 }
                 else
                 {
-                      studentUserId = await _context.Students
-                        .Where(s => s.StudentCode == studentCode)
-                        .Select(s => s.UserId)
-                        .FirstOrDefaultAsync();
+                    studentUserId = await _context.Students
+                      .Where(s => s.StudentCode == studentCode)
+                      .Select(s => s.UserId)
+                      .FirstOrDefaultAsync();
 
-                     folderName = $"{studentUserId}_{studentCode}";
-                     filePath = $"{folderName}/{documentName}";
+                    folderName = $"{studentUserId}_{studentCode}";
+                    filePath = $"{folderName}/{documentName}";
                 }
 
                 using var memoryStream = new MemoryStream();
@@ -286,7 +329,7 @@ namespace CoopEducation.Services
                         }
                     }
 
-                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName, userId, docId, filePath,studentId);
+                    SetLogDocDTO logDoc = _allServices.LogDoc(roleName, userId, docId, filePath, studentId);
                     _allServices.SysDocLogs(logDoc, roleName);
 
                     return filePath;
@@ -303,13 +346,13 @@ namespace CoopEducation.Services
                 return string.Empty;
             }
         }
-        public async Task<string?> GetSignedUrl(int userId, int docId, string uniqueName,string? studentCode)
+        public async Task<string?> GetSignedUrl(int userId, int docId, string uniqueName, string? studentCode)
         {
             var bucket = _supabaseClient.Storage.From("StudentReport");
             string filePath;
             if (studentCode == null)
             {
-                 filePath = $"{userId}_{uniqueName}/{GetDocumentName(docId)}";
+                filePath = $"{userId}_{uniqueName}/{GetDocumentName(docId)}";
             }
             else
             {
@@ -332,7 +375,7 @@ namespace CoopEducation.Services
 
             List<DocumentExistDto> exist = _context.StudentDocuments
                 .Where(x => x.StudentId == studentId)
-                .Select(x => new { x.DocTypeId, x.UploadedAt, x.Approved }) 
+                .Select(x => new { x.DocTypeId, x.UploadedAt, x.Approved })
                 .AsEnumerable()
                 .GroupBy(x => x.DocTypeId)
                 .Select(g => g.OrderByDescending(x => x.UploadedAt).First())
@@ -387,7 +430,47 @@ namespace CoopEducation.Services
                 return false;
             }
         }
-
+        public async Task<string?> PreviewFile(string roleName, int id, int docId)
+        {
+            var bucket = _supabaseClient.Storage.From(GetbucketName(roleName));
+            int? userId = await GetUserId(id, roleName);
+            string? uniqueName = await GetUsername(userId);
+            string filePath = $"{userId}_{uniqueName}/{GetDocumentName(docId)}";
+            var signedUrl = await bucket.CreateSignedUrl(filePath, 60);
+            signedUrl = signedUrl.TrimEnd('?');
+            return signedUrl;
         }
+        public async Task<int?> GetUserId(int id, string role)
+        {
+            if (role == "student")
+            {
+                return await _context.Students
+                    .Where(s => s.StudentId == id)
+                    .Select(s => s.UserId)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (role == "teacher")
+            {
+                return await _context.Teachers
+                    .Where(t => t.TeacherId == id)
+                    .Select(t => t.UserId)
+                    .FirstOrDefaultAsync();
+            }
+
+            return null;
+        }
+        public async Task<string?> GetUsername(int? userId)
+        {
+            if (userId > 0)
+            {
+                return await _context.Users
+                    .Where(u => u.UserId == userId)
+                    .Select(u => u.Username)
+                    .FirstOrDefaultAsync();
+            }
+            return null;
+        }
+    }
 
 }

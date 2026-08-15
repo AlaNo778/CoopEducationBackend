@@ -2,6 +2,7 @@
 using CoopEducation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Supabase.Gotrue;
 using System.Security.Claims;
 using static CoopEducation.Models.Constant.ConstantVariables;
 
@@ -26,13 +27,20 @@ namespace CoopEducation.Controllers.DocAndForm
                 _docService = docService;
         }
         [HttpGet]
-        public async Task<List<int?>> GetDocumentinfo()
+        public async Task<List<int?>> GetDocumentinfo([FromQuery]int? tUserId,[FromQuery] string? tRoleName)
         {
-            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
-            string methodName = MethodOfLogSystem.GET.ToString();
-            string roleName = _userService.GetClaimValue(ClaimTypes.Role);
-            List<int?> listDoc = await _docService.GetExistDoc(userId, roleName);
-            return listDoc;
+            if (tUserId > 0 && tRoleName != null)
+            {
+                List<int?> listDoc = await _docService.GetExistDoc(null, null, tUserId, tRoleName);
+                return listDoc;
+            }
+            else
+            {
+                int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
+                string roleName = _userService.GetClaimValue(ClaimTypes.Role);
+                List<int?> listDoc = await _docService.GetExistDoc(userId, roleName,null,null);
+                return listDoc;
+            }
         }
     }
 }

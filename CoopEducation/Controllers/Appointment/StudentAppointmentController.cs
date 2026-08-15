@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using CoopEducation.Models;
 using CoopEducation.Models.DTO;
 using CoopEducation.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace CoopEducation.Controllers.Appointment
 {
@@ -26,7 +27,7 @@ namespace CoopEducation.Controllers.Appointment
         {
             int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
             string userRole = _userService.GetClaimValue(System.Security.Claims.ClaimTypes.Role);
-            if (userRole != "student")
+            if (userRole != "student")  
             {
                 return Unauthorized("Only students can book appointments.");
             }
@@ -36,7 +37,37 @@ namespace CoopEducation.Controllers.Appointment
                 return BadRequest("Failed to book appointment slot.");
             }
             return Ok();
+        }
+        [HttpGet]
+        public async Task<IActionResult> BookingDetail()
+        {
+            int userId = Convert.ToInt32(_userService.GetClaimValue("sub"));
+            string userRole = _userService.GetClaimValue(System.Security.Claims.ClaimTypes.Role);
 
+            if (userRole != "student")
+            {
+                return Unauthorized();
+            }
+
+            int studentId = _allServices.GetStudentId(userId);
+
+            var bookingDetail = await _context.SupervisionAppointments
+                .Where(s => s.StudentId == studentId && s.CancelledAt == null)
+                .Select(s => new BookingDetailDTO
+                {
+                    AppointmentId = s.AppointmentId,
+                    SlotId = s.SlotId,
+                    StudentId = s.StudentId,
+                    TeacherId = s.TeacherId,
+                    AppointmentStatus = s.AppointmentStatus,
+                    StudentNote = s.StudentNote,
+                    TeacherNote = s.TeacherNote,
+                    BookedAt = s.BookedAt,
+                    Slot = s.Slot,
+                })
+                .FirstOrDefaultAsync();
+
+            return Ok(bookingDetail);
         }
     }
 }
